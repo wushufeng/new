@@ -94,7 +94,7 @@ static int net1000ThreadFunc(void *arg)
     	 * 正确返回接收到数据的总长度,所读出的数据放入query_net1000所指向的地址中
     	 * 错误返回-1
     	 */
- //   	printf("11111...\n");
+    	printf("11111...\n");
 	    for(;;){
 	    	if(res == -1)
 	    		goto disconnect;
