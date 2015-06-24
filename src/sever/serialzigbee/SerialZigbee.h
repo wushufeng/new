@@ -115,9 +115,11 @@ typedef struct
 	unsigned short int cycle;												// 周期（无符号整数，10ms，由功图参数得到）
 	unsigned short int dot;													// 点数（无符号整数型，由功图参数得到）
 	unsigned short int time_interval;									// 时间间隔
-	unsigned char flag;															// 是否有该电参
+	unsigned char elec_flag;													// 是否有该电参
+	unsigned char elecOK;													// 电参全部采集完毕
+	unsigned char dgOK;														// 功图全部采集完毕
 	ZB91_revdata_framehead ZB91_framehead;					// ZigBee帧头
-	A11_data_framehead A11_framehead;							// A11帧头
+	A11_data_framehead A11_framehead;								// A11帧头
 }__attribute__((packed)) data_exchange	;
 
 /* @brief
