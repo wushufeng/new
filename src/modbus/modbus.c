@@ -921,10 +921,10 @@ int modbus_receive(modbus_t *ctx, uint8_t *req, int flag)
 	switch(flag)
 	{
 		case 11:
-			receive_msg_net(ctx, req, MSG_INDICATION);
+			return receive_msg_net(ctx, req, MSG_INDICATION);
 			break;
 		case 22:
-			receive_msg_comm(ctx, req, MSG_INDICATION);
+			return receive_msg_comm(ctx, req, MSG_INDICATION);
 			break;
 		default:
 			return receive_msg(ctx, req, MSG_INDICATION);

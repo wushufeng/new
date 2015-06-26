@@ -631,7 +631,7 @@ typedef struct
 typedef struct
 {
 	load_displacement dynagraph;											// 油井示功图采集数据存储地址表
-	unsigned short int reserved_address2[1000];			// 预留地址
+	unsigned short int reserved_address2[1000];				// 预留地址
 }E3_load_displacement;
 // E4 油井功能参数控制指令存储地址表
 typedef struct

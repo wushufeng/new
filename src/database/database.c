@@ -5,18 +5,26 @@
  *      Author: wsf
  */
 
-# include <stdio.h>
-# include <stdlib.h>
-# include <unistd.h>
-# include <errno.h>
-# include <string.h>
-# include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <time.h>
+#include <sqlite3.h>
+
 
 #include "database.h"
-#include "../A11_sysAttr/a11sysattr.h"
+//#include "../A11_sysAttr/a11sysattr.h"
 #include "../sever/sysdatetime/getsysdatetime.h"
 #include "../A11_sysAttr/a11sysattr.h"
 #include "../inifile/inifile.h"
+
+#define ALLWELL	17
+exchangebuffer *pexbuffer[ALLWELL];											// 存放功图电参的临时buffer
+extern oil_well *poilwell[17];
+
 
 const uint16_t UT_BITS_ADDRESS = 0x13;
 const uint16_t UT_BITS_NB = 0x25;
@@ -45,32 +53,90 @@ const uint16_t UT_INPUT_REGISTERS_TAB[] = { 0x000A };
 const float UT_REAL = 916.540649;
 const uint32_t UT_IREAL = 0x4465229a;
 
-modbus_mapping_t *mb_mapping[17];
+modbus_mapping_t *mb_mapping[ALLWELL];
 pthread_t database_hread;
 extern E1_sys_attribute *psysattr;
+
 //extern pthread_mutex_t holdingReg_mutex;
 
-static void *databaseThreadFunc(void *arg);
+static int databaseThreadFunc(void *arg);
+static int syncElecData(int group);
+static int syncDgData(int group);
 
-static void *databaseThreadFunc(void *arg)
+static int databaseThreadFunc(void *arg)
 {
+	int n;
 	for(;;)
 	{
+		// 读取当前系统时间
 		if(getSysLocalDateTime(arg) != 0)
-				return "time erro";
-//		pthread_mutex_lock(&holdingReg_mutex);
-//		A11toHoldingReg(arg);
-//		pthread_mutex_unlock(&holdingReg_mutex);
+		{
+			printf("[提示]系统时间读取有误!\n");
+			return -1;
+		}
+		pexbuffer[2]->elec_OK = 0x3C;
+		pexbuffer[2]->elec_online = 0x3C;
+		pexbuffer[2]->dg_OK = 0x3C;
+		pexbuffer[2]->dg_online = 0x3C;
+
+		// TODO 判断是否有数据要更新MBbuffer
+		for(n = 0; n < ALLWELL; n ++)
+		{
+			if((pexbuffer[n]->elec_online == 0x3C) && (pexbuffer[n]->dg_online == 0x3C))
+			{
+				// 功图和电参都在线
+				if((pexbuffer[n]->dg_OK == 0x3C) && (pexbuffer[n]->elec_OK == 0x3C))
+				{
+					pexbuffer[n]->dg_OK = 0x00;
+					pexbuffer[n]->dg_online = 0x00;
+					pexbuffer[n]->elec_OK = 0x00;
+					pexbuffer[n]->elec_online = 0x00;
+					syncDgData(n);
+					syncElecData(n);
+					printf("[提示]功图和电参数据完成同步!\n");
+					//TODO 同步后将该数据转入数据库中
+
+				}
+			}
+			else if((pexbuffer[n]->dg_online == 0x3C) && (pexbuffer[n]->dg_OK == 0x3C))
+			{
+				// 只有功图在线 并获得完整功图数据
+				pexbuffer[n]->dg_OK = 0x00;
+				pexbuffer[n]->dg_online = 0x00;
+				syncDgData(n);
+			}
+			else if((pexbuffer[n]->elec_online == 0x3C) && (pexbuffer[n]->elec_OK == 0x3C))
+			{
+				// 只有电参在线 并获得完整电参数据
+				pexbuffer[n]->elec_OK = 0x00;
+				pexbuffer[n]->elec_online = 0x00;
+				syncElecData(n);
+			}
+			else
+			{
+
+			}
+		}
+
 		sleep(5);
-//		setSyslocaldate(psysattr);
 	}
-	return NULL;
+	pthread_exit((void *)0);
+//	return 0;
 }
 int createDatabaseThread(void)
 {
 	int res;
-
-	res = pthread_create(&database_hread, NULL, &databaseThreadFunc, (void *)psysattr);
+	int n;
+	for(n = 0; n < ALLWELL; n ++)
+	{
+		pexbuffer[n] = (exchangebuffer *)malloc(sizeof(exchangebuffer));
+		if (pexbuffer[n] == NULL) {
+			printf("[提示]申请数据交换空间%d失败!\n", n);
+			return -1;
+		}
+		bzero(pexbuffer[n], sizeof(exchangebuffer));
+	}
+	res = pthread_create(&database_hread, NULL, (void *)&databaseThreadFunc, (void *)psysattr);
     if(res != 0)
     {
         perror("Thread creation failed");
@@ -127,31 +193,7 @@ int mbMappingNew(void)
     return 0;
 //    return mb_mapping;
 }
-/*@brief
- * wsf
- * 将A11系统属性导入holding寄存器
- */
-int A11toHoldingReg(void *p_sysattr)
-{
-//	int i ;
-//	uint16_t *ptr;
-//	E1_sys_attribute *p_sa = (E1_sys_attribute *)p_sysattr;
-//	i = sizeof(E1_sys_attribute);
-//	p_sysattr->baseinfo.well_station_type = 0x1111;
 
-//	 mb_mapping->tab_registers = &(p_base_info->well_station_type);
-
-//	ptr = (uint16_t *)&(p_sa->baseinfo.well_station_type);
-//    for(i = 0; i < UT_REGISTERS_NB; i ++)E1_sys_attributeE1_sys_attributeE1_sys_attribute
-//    {
-//    	mb_mapping->tab_registers[UT_REGISTERS_ADDRESS + i] =
-//    			*ptr ++ ;
-//    }
-//    memcpy((void *)mb_mapping->tab_registers,p_sysattr,UT_REGISTERS_NB * 2);
-//    memcpy((void *)mb_mapping->tab_registers,p_sysattr,sizeof(A11_sysattr));
-    mb_mapping[0]->tab_registers = p_sysattr;
-	return 0;
-}
 /* @brief
  * wsf
  * 通过0x06功能码修改配置文件
@@ -363,5 +405,26 @@ int mbWriteSigleRegister(uint16_t address, int data)
 			break;
 	}
 
+	return 0;
+}
+/*
+ * 同步功图电参数据
+ */
+static int syncElecData(int group)
+{
+	memcpy(&poilwell[group]->load_displacement.dynagraph.current, &pexbuffer[group]->loaddata.current, 250);
+	memcpy(&poilwell[group]->load_displacement.dynagraph.power, &pexbuffer[group]->loaddata.power, 250);
+	return 0;
+}
+/*
+ * 同步功图数据
+ */
+static int syncDgData(int group)
+{
+	poilwell[group]->load_displacement.dynagraph.actual_dot = pexbuffer[group]->loaddata.actual_dot;
+	memcpy(&poilwell[group]->load_displacement.dynagraph.pumping_speed, &pexbuffer[group]->loaddata.pumping_speed, 4);
+	memcpy(&poilwell[group]->load_displacement.dynagraph.pumping_stroke, &pexbuffer[group]->loaddata.pumping_stroke, 4);
+	memcpy(&poilwell[group]->load_displacement.dynagraph.load, &pexbuffer[group]->loaddata.load, 250);
+	memcpy(&poilwell[group]->load_displacement.dynagraph.displacement, &pexbuffer[group]->loaddata.displacement, 250);
 	return 0;
 }

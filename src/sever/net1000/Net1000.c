@@ -94,7 +94,7 @@ static int net1000ThreadFunc(void *arg)
     	 * 正确返回接收到数据的总长度,所读出的数据放入query_net1000所指向的地址中
     	 * 错误返回-1
     	 */
-    	printf("11111...\n");
+
 	    for(;;){
 	    	if(res == -1)
 	    		goto disconnect;
@@ -244,7 +244,7 @@ int net1000Init(void *obj)
     modbus_set_slave(ctx_net1000, SERVER_ID);
     header_length = modbus_get_header_length(ctx_net1000);
     modbus_set_debug(ctx_net1000, TRUE);
-    modbus_set_debug(ctx_net1000, FALSE);
+//    modbus_set_debug(ctx_net1000, FALSE);
 //    if (mb_mapping == NULL)
 //    {
 //        fprintf(stderr, "Failed to allocate the mapping: %s\n", modbus_strerror(errno));
