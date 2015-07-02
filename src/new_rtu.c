@@ -22,6 +22,7 @@
 #include "./sever/serialGPRS/SerialGPRS.h"
 #include "./sever/AI8/a5d35ai.h"
 #include "common/common.h"
+#include "./managerDB/ManagerDB.h"
 
 #define MAXBUFSIZE 512
 char AppPathFileName[MAXBUFSIZE];
@@ -69,7 +70,11 @@ int main(int argc, char *argv[])
 		printf("[错误]启动Database失败!\n");
 		exit(EXIT_FAILURE);
 	}
-
+	printf("[提示]创建sqlite库!\n");
+	openDatabase("./RTU.db");
+	createDatabase(DBfd);
+	closeDatabase(DBfd);
+	printf("[提示] 完成!\n");
 	/* @brief
 	 * wsf
 	 * 创建aidi线程
