@@ -11,5 +11,5 @@
 int serial232Init(void *obj);
 int createSerial232Thread(void);
 void serial232Free();
-
+int serial232ThreadCancel(void);
 #endif /* SRC_SEVER_SERIAL232_SERIAL232_H_ */

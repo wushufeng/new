@@ -10,10 +10,12 @@
 #include	<sqlite3.h>
 
 extern const char *dbfile;
-extern sqlite3 *DBfd;
+extern sqlite3 *pDB;
 
-int openDatabase(const char *dbfile);
+int openDatabase(const char *dbfile, sqlite3 *db);
 int closeDatabase(sqlite3 *db);
-int createDatabase(sqlite3 *db);
-
+int createSqlTable(void);
+int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag);
+int testCreateTables(void);
+int showRecordsByTime(time_t time);
 #endif /* SRC_MANAGERDB_MANAGERDB_H_ */

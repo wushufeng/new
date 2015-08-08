@@ -22,7 +22,7 @@
 #include "../../database/database.h"
 #include "../../modbus/modbus-private.h"
 #include "../sysdatetime/getsysdatetime.h"
-
+#include "../../log/rtulog.h"
 //#define 	ZIGBEEDEVICE			"/dev/ttyS3"
 #define 	ZIGBEEDEVICE			"/dev/ttyUSB0"
 modbus_t *ctx_zigbee;
@@ -33,8 +33,8 @@ pthread_t zigbee_thread;
 ZB_explicit_RX_indicator *ZB_91_normal;
 extern oil_well *poilwell[17];
 
-load_displacement *ptempbuf[17];									// 存放功图电参得临时buffer
-
+//load_displacement *ptempbuf[17];									// 存放功图电参得临时buffer
+extern exchangebuffer *pexbuffer[17];											// 存放功图电参的临时buffer
 
 
 unsigned char instrument_group;									// 定义全局仪器组号，用次判断数据存放位置
@@ -67,19 +67,20 @@ data_exchange data_ex[17] = {{0x10, 0x00, 0xF79C, 0x0000, 0x0000, 0x00C8, 0x04CC
 		{0x10, 0x00, 0xF79C, 0x0000, 0x0000, 0x00C8, 0x04CC, 0x00, 0x00, 0x00},
 		{0x10, 0x00, 0xF79C, 0x0000, 0x0000, 0x00C8, 0x04CC, 0x00, 0x00, 0x00},
 		{0x10, 0x00, 0xF79C, 0x0000, 0x0000, 0x00C8, 0x04CC, 0x00, 0x00, 0x00}};
-unsigned char AT_ND[8] = {0x7E,0x00,0x04,0x08,0x01,0x4E,0x44,0x64};  //寻找和报告网络模块
+//unsigned char AT_ND[8] = {0x7E,0x00,0x04,0x08,0x01,0x4E,0x44,0x64};  //寻找和报告网络模块
 //uint8_t rsp[64] = {0x7E,0x00,0x20,0x11,0x00,0x00,0x13,0xA2,0x00,0x40,0xA7,0x62,0xFE,0xFF,0xFE,0xE8,0xE8,0x00,0x11,0x18,0x57,0x00,0x60,0x00,0x00,0x00,0x22,0x00,0x03,0x01,0x01,0x01,0x00,0x00,0x0A,0x07};
 unsigned char rsp_data[260];
 unsigned char req_data[260];
 
 
 /////////////////debug//////////////////////
+//unsigned char electR[35] = {0x7E, 0x00, 0x1F, 0x11, 0x00, 0x00, 0x13, 0xA2, 0x00, 0x40, 0xA8, 0x98, 0xA1, 0xE0, 0x9E, 0xE8, 0xE8, 0x00, 0x11, 0x18, 0x57, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x1F, 0x10, 0x01, 0x01, 0x02, 0x11, 0x0C, 0xF6};
 //time_t d_tm_now;							// 读出当前时间秒数
 //time_t d_tm_start;
 // tcsetattr
 //struct timeval t_start, t_end;
 
-long cost_time = 0;
+//long cost_time = 0;
 /////////////////debug//////////////////////
 
 typedef enum {
@@ -107,6 +108,7 @@ inline int conventionalDataRespone(unsigned short int sleeptime);
 static int collectDynagraphRespone(data_exchange *datex);
 static int collectElecRespone(data_exchange *datex);
 inline int dataGroupRespone(unsigned short int data_type);
+inline int dataGroupResponeElec(unsigned short int data_type);
 static int readElecRespone(data_exchange *datex);
 static int ZBnetinResponse();
 
@@ -114,73 +116,52 @@ static int ZBnetinResponse();
 static int zigbeeThreadFunc(void *arg)
 {
 	int rc;
-	int n;
-//	uint8_t rsp[260];
-
-	for(n = 0; n < 17; n ++)
-	{
-		ptempbuf[n] = (load_displacement*)malloc(sizeof(load_displacement));
-		if (ptempbuf[n] == NULL) {
-			return -1;
-		}
-		bzero(ptempbuf[n],sizeof(load_displacement));
+	int res;
+	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Zigbee线程pthread_setcancelstate失败");
+		exit(EXIT_FAILURE);
+	}
+	res = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Zigbee线程pthread_setcanceltype失败");
+		exit(EXIT_FAILURE);
 	}
 
     rc = modbus_connect(ctx_zigbee);
     if (rc == -1) {
-        fprintf(stderr, "[错误]ZigBee接口不能连接! %s\n", modbus_strerror(errno));
-        modbus_free(ctx_zigbee);
-        return -1;
+        zlog_error(c, "ZigBee接口不能连接! %s\n", modbus_strerror(errno));
+//        modbus_free(ctx_zigbee);
+        pthread_exit(0);
+//        return -1;
     }
     for(;;)
     {
-//    	ttt= zigbeeCheck(rsp,3,35);
-//    	rsp[35] = ttt;
-//    	rc  = ctx_zigbee->backend->send(ctx_zigbee, rsp, 36);
-//    	sleep(2);
-//    	rc = receive_msg_zigbee(ctx_zigbee, rsp, MSG_CONFIRMATION);
-//    	gettimeofday(&t_start, NULL);
-//
-//    	printf("Start time: %ld us\n", t_start.tv_usec);
     	rc = receive_msg_zigbee(ctx_zigbee, req_data, MSG_INDICATION);
-    	// 读时间
-    	//get start time
-//
-//    	gettimeofday(&t_start, NULL);
-//
-//    	printf("Start time: %ld us\n", t_start.tv_usec);
 
-//		rc = modbus_read_registers(ctx_zigbee, UT_REGISTERS_ADDRESS,
-//								   i, tab_rp_registers);
-//		printf("2/5 modbus_read_registers: ");
 
         if (rc == -1) {
             /* Connection closed by the client or error */
-//            break;
-        	goto sl;
+        	zlog_warn(c, "Zigbee接收数据错误 = %d\n", rc);
+        	continue;
         }
         if (ctx_zigbee->debug) {
             int i;
-            printf(">> ");
+            if(rc)
+            	printf(">> ");
             for (i=0; i < rc; i++)
 //                printf("<%.2X>", msg[msg_length + i]);
             	printf("%.2X ", req_data[i]);
-            printf("\n");
+            if(rc)
+            	printf("\n");
         }
         rc = zigbee_reply(ctx_zigbee, req_data, rc);//, mb_mapping);
         if (rc == -1) {
             /* Connection closed by the client or error */
-//            break;
-        	goto sl;
+        	zlog_warn(c, "Zigbee发送数据错误 = %d\n", rc);
+        	continue;
         }
-        //get end time
-//        gettimeofday(&t_end, NULL);
-//        printf("End time: %ld us ", t_end.tv_usec);
-//        //calculate time slot
-//        cost_time = t_end.tv_usec - t_start.tv_usec;
-//        printf("Cost time: %ld us\n", cost_time);
-sl:
-	sleep(1);
+	//sleep(1);//此处休眠时间过长，不能有
 	}
 //close:
 //    /* Free the memory */
@@ -189,7 +170,7 @@ sl:
 //    /* Close the connection */
 //    modbus_close(ctx_zigbee);
 //    modbus_free(ctx_zigbee);
-	return 0;
+	pthread_exit(0);
 }
 int createZigbeeThread(void)
 {
@@ -304,19 +285,40 @@ int serialZigbeeInit(void *obj)
 //    tab_rp_registers = (uint16_t *) malloc(300 * sizeof(uint16_t));
 //    memset(tab_rp_registers, 0, 300 * sizeof(uint16_t));
 
+	return 0;
+}
+int serialZigbeeCancel(void)
+{
+	int res;
+	void * thread_result;
 
+	int kill_rc = pthread_kill(zigbee_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
+	zlog_info(c, "正在取消SerialZigbee线程...");
+	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
+		zlog_warn(c, "SerialZigbee线程不存在或者已经退出");
+	else if(kill_rc == EINVAL)		// 信号不合法：EINVAL
+		zlog_warn(c, "signal is invalid/n");
+	else
+	{
+		res = pthread_cancel(zigbee_thread);
+		if(res != 0)	{
+			zlog_error(c, "取消SerialZigbee线程失败-%d", res);
+			exit(EXIT_FAILURE);
+		}
+	}
 
+	zlog_info(c, "正在等待SerialZigbee线程结束...");
+	res = pthread_join(zigbee_thread, &thread_result);
+	if(res != 0)	{
+		zlog_error(c, "等待SerialZigbee线程结束失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
 	return 0;
 }
 void serialZigbeeFree()
 {
-	int n;
-//	if(mb_mapping !=NULL)
-//		modbus_mapping_free(mb_mapping);
-	 modbus_close(ctx_zigbee);
-//	if(query_serial232 !=NULL)
-//		free(query_serial232);
 
+	 modbus_close(ctx_zigbee);
 
 	if((ctx_zigbee != NULL) &&(ctx_zigbee->backend != NULL))
 	{
@@ -326,11 +328,11 @@ void serialZigbeeFree()
 			free(ctx_zigbee);
 		}
 	}
-	for(n = 0; n < 17; n ++)
-	{
-		if(ptempbuf[n] != NULL)
-			free(ptempbuf[n]);
-	}
+//	for(n = 0; n < 17; n ++)
+//	{
+//		if(ptempbuf[n] != NULL)
+//			free(ptempbuf[n]);
+//	}
 }
 static int receive_msg_zigbee(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
 /*
@@ -347,9 +349,9 @@ static int receive_msg_zigbee(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
 
     if (ctx->debug) {							// 如果是debug模式显示当前状态
         if (msg_type == MSG_INDICATION) {
-            printf(">[提示]等待ZigBee设备发送指令\n");
+            zlog_debug(c, "等待ZigBee设备发送指令...");
         } else {
-            printf(">[提示]Waiting for a confirmation...\n");
+            zlog_debug(c, "Waiting for a confirmation...");
         }
     }
 
@@ -476,7 +478,7 @@ static int receive_msg_zigbee(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
                     break;
                 } /* else switches straight to the next step */
             case _STEP_META:															// 程序运行至此说明meta元数据读取完毕,再根据元计算还要读出的数据
-            		length_to_read = 1;													// jiaoyahefanma
+            		length_to_read = 1;													// 校验和反码
 //                length_to_read = compute_data_length_after_meta_zigbee(
 //                    ctx, msg, msg_type);
                 /*
@@ -506,12 +508,13 @@ static int receive_msg_zigbee(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
                interval between two consecutive bytes is defined by
                byte_timeout */
         	/*
-        	 * 完成第一次select后,说明接受到了数据,这是要把select的时间参数tv改为接受每个字节间所需最大时间
+        	 * 完成第一次select后,说明接收到到了数据,这是要把select的时间参数tv改为接受每个字节间所需最大时间
         	 * 即为modbus中的分包时间,3.5个字节长
         	 */
             tv.tv_sec = ctx->byte_timeout.tv_sec;
             tv.tv_usec = ctx->byte_timeout.tv_usec;
             p_tv = &tv;
+//            p_tv = NULL;
         }
     }
 
@@ -582,20 +585,10 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 
 	unsigned char  ZB_state;
 	unsigned char API_Check;
-//	uint16_t temp_data = 0;
-//	uint8_t MACAddr[8];
-//	uint8_t revOption;
-//	uint8_t * ptr1, * ptr2;
 	int rsp_length = 0;
 	int res;
 	unsigned char n;
-//	static unsigned int ttt = 20;
-//	unsigned char dg_group;
-//	unsigned char dg_num;
-//	unsigned char dg_remainder;
-//	unsigned short int dg_dot;
-//	conventional_data_frame_format *ZB_91_press;
-//	int i;
+
 	ZB_91_normal = (ZB_explicit_RX_indicator *)req;
 	switch (ZB_91_normal->ZB91_framehead.farme_type)
 	{
@@ -648,14 +641,14 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 				ZB91_poweron_framehead * zb_poweron;
 				zb_poweron = (ZB91_poweron_framehead *)req;
 				zb_poweron->ZB91_framehead.mac_addr[0]= 0;
-				printf("[提示]ZigBee模块MAC = %.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X上电！\n",
-						zb_poweron->ZB91_framehead.mac_addr[0],
-						zb_poweron->ZB91_framehead.mac_addr[1],
-						zb_poweron->ZB91_framehead.mac_addr[2],
-						zb_poweron->ZB91_framehead.mac_addr[3],
-						zb_poweron->ZB91_framehead.mac_addr[4],
-						zb_poweron->ZB91_framehead.mac_addr[5],
-						zb_poweron->ZB91_framehead.mac_addr[6],
+				zlog_info(c, "ZigBee模块MAC = %.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X上电！\n", \
+						zb_poweron->ZB91_framehead.mac_addr[0], \
+						zb_poweron->ZB91_framehead.mac_addr[1], \
+						zb_poweron->ZB91_framehead.mac_addr[2], \
+						zb_poweron->ZB91_framehead.mac_addr[3], \
+						zb_poweron->ZB91_framehead.mac_addr[4], \
+						zb_poweron->ZB91_framehead.mac_addr[5], \
+						zb_poweron->ZB91_framehead.mac_addr[6], \
 						zb_poweron->ZB91_framehead.mac_addr[7]);
 				break;
 			}
@@ -664,24 +657,24 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 				ZB91_netin_framehead * zb_netin;
 				zb_netin = (ZB91_netin_framehead *)req;
 				zb_netin->ZB91_framehead.mac_addr[0]= 0;
-				printf("[提示]ZigBee模块MAC = %.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X入网成功！\n",
-						zb_netin->ZB91_framehead.mac_addr[0],
-						zb_netin->ZB91_framehead.mac_addr[1],
-						zb_netin->ZB91_framehead.mac_addr[2],
-						zb_netin->ZB91_framehead.mac_addr[3],
-						zb_netin->ZB91_framehead.mac_addr[4],
-						zb_netin->ZB91_framehead.mac_addr[5],
-						zb_netin->ZB91_framehead.mac_addr[6],
+				zlog_info(c, "ZigBee模块MAC = %.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X:%.2X入网成功！\n", \
+						zb_netin->ZB91_framehead.mac_addr[0], \
+						zb_netin->ZB91_framehead.mac_addr[1], \
+						zb_netin->ZB91_framehead.mac_addr[2], \
+						zb_netin->ZB91_framehead.mac_addr[3], \
+						zb_netin->ZB91_framehead.mac_addr[4], \
+						zb_netin->ZB91_framehead.mac_addr[5], \
+						zb_netin->ZB91_framehead.mac_addr[6], \
 						zb_netin->ZB91_framehead.mac_addr[7]);
 				rsp_length = ZBnetinResponse();
-				res = send_zigbee_msg(ctx, rsp_data, rsp_length);
-				if(res == -1)
-				{
-					printf("[提示]发送请求路由表命令失败!\n");
-					break;
-				}
-				memcpy(rsp_data, AT_ND, sizeof(AT_ND));
-				rsp_length = sizeof(AT_ND);
+//				res = send_zigbee_msg(ctx, rsp_data, rsp_length);
+//				if(res == -1)
+//				{
+//					printf("[提示]发送请求路由表命令失败!\n");
+//					break;
+//				}
+//				memcpy(rsp_data, AT_ND, sizeof(AT_ND));
+//				rsp_length = sizeof(AT_ND);
 				break;
 			}
 			case 0x0011:	// 油田A11
@@ -689,19 +682,19 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 				if(ZB_91_normal->ZB91_framehead.source_endpoint != 0xE8 ||
 						ZB_91_normal->ZB91_framehead.destination_endpoint != 0xE8)
 				{
-					printf("[提示] 源端 = %d, 目的端 =  %d \n", ZB_91_normal->ZB91_framehead.source_endpoint, ZB_91_normal->ZB91_framehead.destination_endpoint);
+					zlog_info(c, "源端 = %d, 目的端 =  %d \n", ZB_91_normal->ZB91_framehead.source_endpoint, ZB_91_normal->ZB91_framehead.destination_endpoint);
 					break;
 				}
 			// 判断簇ID是否是0x00 0x11
 				if(htons(ZB_91_normal->ZB91_framehead.cluster_ID) != 0x0011)
 				{
-					printf("[提示] 簇ID = %d,不等于0x0011(17)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
+					zlog_info(c, "簇ID = %d,不等于0x0011(17)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
 					break;
 				}
 			// 判断规范ID是否是A11规定得0x1857传输时使用的 profile ID（建议用中国石油股票代码的后 4 位）
 				if(htons(ZB_91_normal->ZB91_framehead.profile_ID) != 0x1857)
 				{
-					printf("[提示] 规范ID = %d,不等于0x1857(6231)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
+					zlog_info(c, "规范ID = %d,不等于0x1857(6231)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
 					break;
 				}
 			// 读出收到数据得仪器对应的仪器组号
@@ -715,41 +708,51 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 						time_t now_time = time(NULL);							// 读出当前时间秒数
 						static time_t last_time[17] = {0};
 
-
-						poilwell[instrument_group]->load_displacement.dynagraph.interval = 10;				//设置功图自动测量间隔为5分钟
+						poilwell[instrument_group]->load_displacement.dynagraph.interval = 5;				//设置功图自动测量间隔为5分钟
 						A11_req_revdata_dynagraph * dynagraph;
 						dynagraph = (A11_req_revdata_dynagraph *)req;
+
 						switch(htons(dynagraph->A11_framehead.data_type))
 						{
 							case 0x0000:				//	上传的常规数据
-
-								if((last_time[instrument_group] == 0) ||(poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order != 0)
-										|| (now_time > (last_time[instrument_group] + poilwell[instrument_group]->load_displacement.dynagraph.interval * 60)))
+								// 说明功图在线
+								// 判断是否发送功图采集命令
+								if(((last_time[instrument_group] == 0) || (poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order != 0) \
+										|| (now_time > (last_time[instrument_group] + poilwell[instrument_group]->load_displacement.dynagraph.interval * 60))) \
+												&& (pexbuffer[instrument_group]->dg_online == 0x3C))
 								{
+									// 取出测试间隔
+									pexbuffer[instrument_group]->loaddata.interval = poilwell[instrument_group]->load_displacement.dynagraph.interval;
+									// 取出预设得测试点数
+									pexbuffer[instrument_group]->loaddata.set_dot = poilwell[instrument_group]->load_displacement.dynagraph.set_dot;
+									// 清零手动采集标识
 									poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order = 0;
 									last_time[instrument_group] = now_time;
 									// 发送功图采集命令
+									usleep(100000);
+									zlog_info(c, "开始发送功图[组=%d]采集命令!\n", instrument_group);
 									rsp_length = collectDynagraphRespone(&data_ex[instrument_group]);
-									printf("[提示]开始发送功图采集[组=%d]命令!\n", instrument_group);
 
-									// 发送电参采集命令
-									if((data_ex[instrument_group].elec_flag == 0x3C)&&(data_ex[instrument_group].A11_framehead.instrument_group == dynagraph->A11_framehead.instrument_group))													// 说明有电参
+									// 判断对应组号得电参是否在线，是则，发送电参采集命令
+									if(pexbuffer[instrument_group]->elec_online == 0x3C)
 									{
 										res = send_zigbee_msg(ctx, rsp_data, rsp_length);
 										if(res == -1)
 										{
-											printf("[提示]发送一体化功图采[组=%d]集命令失败!\n", instrument_group);
+											zlog_info(c, "提示]发送一体化功图采[组=%d]集命令失败!\n", instrument_group);
 											break;
 										}
+										zlog_info(c, "开始发送电参[组=%d]采集命令!\n", instrument_group);
 										rsp_length = collectElecRespone(&data_ex[instrument_group]);
-										printf("[提示]开始发送电参[组=%d]采集命令!\n", instrument_group);
 									}
 								}
 								else
 								{
+									pexbuffer[instrument_group]->dg_online = 0x3C;
+									zlog_info(c, "接收到一体化功图[组=%d]常规数据帧!\n", instrument_group);
 									// 常规数据应答
-									rsp_length = conventionalDataRespone(0x0020);
-									printf("[提示]发送一体化功图[组=%d]常规数据应答!\n", instrument_group);
+									rsp_length = conventionalDataRespone(0x003C);
+
 								}
 								break;
 							case 0x0010:				// 上传的常规参数
@@ -757,16 +760,12 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 								break;
 							case 0x0020:				// 上传的功图数据包
 							{
-
-//								d_tm_start = time(NULL);
 								float tempdata = 0;
-//								printf("%d", (int)d_tm_start);
 								A11_req_dynagraph_first *dynagraph_data;
 								dynagraph_data = (A11_req_dynagraph_first *)req;
 								if(dynagraph_data->data_serialnum[0] == 0)									// 说明该数据为第一组数据
 								{
 									dg_dot = htons(dynagraph_data->dot);
-//									printf("; dynagraph_data->dot =  %d; dg_dot = %d \n", dynagraph_data->dot,  dg_dot);
 									if(dg_dot <=  250)
 									{
 										dg_group = (unsigned char)(dg_dot / 15);
@@ -774,7 +773,7 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									}
 									else
 									{
-										printf("[错误]一体化功图[组=%d]采集总点数[%d] > 250! \n",  instrument_group, dg_dot);
+										zlog_warn(c, "一体化功图[组=%d]采集总点数[%d] > 250! \n",  instrument_group, dg_dot);
 										dg_group = 0;
 										dg_remainder = 0;
 										break;
@@ -783,16 +782,14 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									data_ex[instrument_group].time_mark = htons(dynagraph_data->time_mark);
 									data_ex[instrument_group].dot = htons(dynagraph_data->dot);
 
-									ptempbuf[instrument_group]->actual_dot = htons(dynagraph_data->dot);
-//									poilwell[instrument_group]->load_displacement.dynagraph.actual_dot = htons(dynagraph_data->dot);						// 功图实际点数
+									pexbuffer[instrument_group]->loaddata.actual_dot = htons(dynagraph_data->dot);
 									tempdata  = (6000.0 / htons(dynagraph_data->cycle));																		// 冲次 10ms
-									memcpy(&ptempbuf[instrument_group]->pumping_speed, &tempdata, 4);
-//									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_speed, &tempdata, 4);//sizeof(float));
+									memcpy(&pexbuffer[instrument_group]->loaddata.pumping_speed, &tempdata, 4);
 									tempdata = (htons(dynagraph_data->stroke) / 1000.0);
-									memcpy(&ptempbuf[instrument_group]->pumping_stroke, &tempdata,4);
-//									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_stroke, &tempdata,4);					// 冲程
-									printf("冲程 = %d   冲程 =  %f \n", htons(dynagraph_data->stroke), tempdata);
-									printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!  \n", instrument_group, dynagraph_data->data_serialnum[0]);
+									memcpy(&pexbuffer[instrument_group]->loaddata.pumping_stroke, &tempdata,4);
+//									zlog_info(c, "冲程 = %d   冲程 =  %f \n", htons(dynagraph_data->stroke), tempdata);
+
+									zlog_info(c, "接收到一体化功图[组=%d]数据第 [%d] 包!  \n", instrument_group, dynagraph_data->data_serialnum[0]);
 								}
 								else
 								{
@@ -805,64 +802,42 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									{
 										for(n = 0; n < 15; n ++)
 										{
-											ptempbuf[instrument_group]->displacement[(dg_num - 1) * 15 + n] =  htons(dynagraph_other->dynagraph[n]);
-											ptempbuf[instrument_group]->load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.displacement[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
+											pexbuffer[instrument_group]->loaddata.displacement[(dg_num - 1) * 15 + n] =  htons(dynagraph_other->dynagraph[n]);
+											pexbuffer[instrument_group]->loaddata.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
 										}
-										printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dg_num);
+										zlog_info(c, "接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dg_num);
 									}
 									else
 									{
 										for(n = 0; n < dg_remainder; n ++)
 										{
-											ptempbuf[instrument_group]->displacement[(dg_num - 1) * 15 + n] =  htons(dynagraph_other->dynagraph[n]);
-											ptempbuf[instrument_group]->load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.displacement[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[15 + n]);
+											pexbuffer[instrument_group]->loaddata.displacement[(dg_num - 1) * 15 + n] =  htons(dynagraph_other->dynagraph[n]);
+											pexbuffer[instrument_group]->loaddata.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
 										}
-										printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dynagraph_other->data_serialnum);
-//										dgOk2elecFlag = 0x3C;			// 表明全部读回功图数据
-										data_ex[instrument_group].dgOK = 0x3C;
+										zlog_info(c, "接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dynagraph_other->data_serialnum);
+										pexbuffer[instrument_group]->dg_time = time(NULL);
+										pexbuffer[instrument_group]->dg_OK = 0x3C;
 									}
-//									printf("[提示]接收到一体化功图数据第 [%d] 包!\n",dynagraph_other->data_serialnum);
 								}
 								rsp_length = dataGroupRespone(0x0201);			// 一体化功图
-								if((data_ex[instrument_group].dgOK == 0x3C)&&(data_ex[instrument_group].elec_flag == 0x3C))
+								if((pexbuffer[instrument_group]->dg_OK == 0x3C) && (pexbuffer[instrument_group]->elec_online == 0x3C))
 								{
-//									data_ex[instrument_group].dgOK = 0;
+
 									res = send_zigbee_msg(ctx, rsp_data, rsp_length);
 									if(res == -1)
 									{
-										printf("[错误]一体化功图[组= %d]数据包有误!\n", instrument_group);
+										zlog_warn(c, "一体化功图[组= %d]数据包有误!\n", instrument_group);
 										break;
 									}
 
 									rsp_length = readElecRespone(&data_ex[instrument_group]);
-									data_ex[instrument_group].elec_flag = 0;
-									printf("[提示]开始读取电流图[组=%d]数据包!\n", instrument_group);
-								}
-								else if((data_ex[instrument_group].dgOK == 0x3C)&&(data_ex[instrument_group].elec_flag != 0x3C))
-								{
-									data_ex[instrument_group].dgOK = 0;
-									// 获取功图采集时间
-									res = getDynagraphDateTime((void *)poilwell[instrument_group]);
-									if(res != 0)
-										printf("[错误]获取一体化功图采集时间有误! \n");
-									// 该井只有功图无电参 全部得到功图数据进行一次数据同步
-									poilwell[instrument_group]->load_displacement.dynagraph.actual_dot = ptempbuf[instrument_group]->actual_dot;
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_speed, &ptempbuf[instrument_group]->pumping_speed, 4);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_stroke, &ptempbuf[instrument_group]->pumping_stroke, 4);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.load, &ptempbuf[instrument_group]->load, 250);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.displacement, &ptempbuf[instrument_group]->displacement, 250);
+									zlog_info(c, "开始读取电流图[组=%d]数据包!\n", instrument_group);
 								}
 								break;
 							}
 							default :
 								break;
 						}
-//						d_tm_now = time(NULL);
-//						printf("time = %d", (int)(d_tm_now - d_tm_start));
 						break;
 					}
 					case 0x0002:											// 无线压力
@@ -909,8 +884,8 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 								= htons(wireless_press->realtime_data[0]) ;
 								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.realtime_data[1]
 								= htons(wireless_press->realtime_data[1]) ;
-								printf("[提示]接收到无线压力[组=%d]常规数据帧!\n", instrument_group);
-								rsp_length = conventionalDataRespone(0x0020);
+								zlog_info(c, "接收到无线压力[组=%d]常规数据帧!\n", instrument_group);
+								rsp_length = conventionalDataRespone(0x004C);
 								break;
 							case 0x0010:													// 上传的常规参数
 								break;
@@ -960,8 +935,8 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 								= htons(wireless_tempreture->realtime_data[0]) ;
 								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.realtime_data[1]
 								= htons(wireless_tempreture->realtime_data[1]) ;
-								printf("[提示]接收到无线温度[组=%d]常规数据帧!\n", instrument_group);
-								rsp_length = conventionalDataRespone(0x0020);
+								zlog_info(c, "接收到无线温度[组=%d]常规数据帧!\n", instrument_group);
+								rsp_length = conventionalDataRespone(0x004C);
 								break;
 							case 0x0010:
 
@@ -979,9 +954,12 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 						switch(htons(elec_param->A11_framehead.data_type))
 						{
 							case 0x0000:				// 电参得常规应答
+								// 说明电参在线
+								pexbuffer[instrument_group]->elec_online = 0x3C;
 								memcpy(&data_ex[instrument_group].ZB91_framehead, &elec_param->ZB91_framehead, sizeof(ZB91_revdata_framehead));
 								memcpy(&data_ex[instrument_group].A11_framehead, &elec_param->A11_framehead, sizeof(A11_data_framehead));
-								data_ex[instrument_group].elec_flag = 0x3C;
+
+
 //								if(elec_param->A11_framehead.company_code == htons(0x0004))	// kaishan
 								{
 									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_a[0] = htons(elec_param->current_phase_a[0]);
@@ -1006,25 +984,10 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									// 无功功率
 									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[0] = htons(elec_param->moto_q[0]);
 									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[1] = htons(elec_param->moto_q[1]);
-									printf("[提示]接收到无线电量[组=%d]常规数据帧!\n", instrument_group);
 
-									rsp_length = conventionalDataRespone(0x003C);
-//									ttt = ttt + 1;
-//									printf("ttt = %d \n", ttt);
-//									if(ttt == 22)
-//									{
-//										send_zigbee_msg(ctx, rsp_data, rsp_length);
-//										// 发送电参开始测试命令
-//										printf("[提示]发送电参开始测试命令! \n");
-//										rsp_length = collectElecRespone(&data_ex);
-//									}
-//									if(ttt == 25)
-//									{
-//										ttt = 0;
-//										send_zigbee_msg(ctx, rsp_data, rsp_length);
-//										printf("[提示]发送电参读电流图命令! \n");
-//										rsp_length = readElecRespone(&data_ex);
-//									}
+									zlog_info(c, "接收到无线电参[组=%d]常规数据帧!\n", instrument_group);
+
+									rsp_length = conventionalDataRespone(0x00B8);
 								}
 								break;
 							case 0x0010:
@@ -1037,7 +1000,6 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 								if(elec_num == 0)									// 说明该数据为第一组数据
 								{
 									elec_dot = htons(elec_data->dot);
-//									printf("; dynagraph_data->dot =  %d; dg_dot = %d \n", dynagraph_data->dot,  dg_dot);
 									if(elec_dot <=  250)
 									{
 										elec_group = (unsigned char)(elec_dot / 15);
@@ -1045,12 +1007,12 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									}
 									else
 									{
-										printf("[错误]电参[组=%d]采集总点数[%d] > 250! \n", instrument_group, dg_dot);
+										zlog_warn(c, "电参[组=%d]采集总点数[%d] > 250! \n", instrument_group, elec_dot);
 										elec_group = 0;
 										elec_remainder = 0;
 										break;
 									}
-									printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!  \n", instrument_group,elec_num);
+									zlog_info(c, "接收到电流图[组=%d]数据第 [%d] 包!  \n", instrument_group,elec_num);
 								}
 								else
 								{
@@ -1062,48 +1024,25 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									{
 										for(n = 0; n < 15; n ++)
 										{
-											ptempbuf[instrument_group]->current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-											ptempbuf[instrument_group]->power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
+											pexbuffer[instrument_group]->loaddata.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
+											pexbuffer[instrument_group]->loaddata.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
 										}
-										printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
+
+										zlog_info(c, "接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
 									}
 									else
 									{
 										for(n = 0; n < dg_remainder; n ++)
 										{
-											ptempbuf[instrument_group]->current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-											ptempbuf[instrument_group]->power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[15 + n]);
+											pexbuffer[instrument_group]->loaddata.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
+											pexbuffer[instrument_group]->loaddata.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
 										}
-										printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
-										data_ex[instrument_group].elecOK = 0x3C;
+										zlog_info(c, "接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
+										pexbuffer[instrument_group]->elec_OK = 0x3C;
 									}
 
-//									printf("[提示]接收到电流图数据第 [%d] 包!\n",elec_num);
 								}
-								if((data_ex[instrument_group].elecOK == 0x3C) && (data_ex[instrument_group].dgOK == 0x3C))
-								{
-									// 先做zigBee回应，再同步数据
-									rsp_length = dataGroupRespone(0x0211);
-									res = send_zigbee_msg(ctx, rsp_data, rsp_length);
-
-									data_ex[instrument_group].elecOK = 0x00;
-									data_ex[instrument_group].dgOK = 0x00;
-									// 正确得到功图和电参数据 进行一次同步
-
-									poilwell[instrument_group]->load_displacement.dynagraph.actual_dot = ptempbuf[instrument_group]->actual_dot;
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_speed, &ptempbuf[instrument_group]->pumping_speed, 4);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_stroke, &ptempbuf[instrument_group]->pumping_stroke, 4);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.load, &ptempbuf[instrument_group]->load, 250);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.displacement, &ptempbuf[instrument_group]->displacement, 250);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.current, &ptempbuf[instrument_group]->current, 250);
-									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.power, &ptempbuf[instrument_group]->power, 250);
-									return res; // 从此处直接返回发送结果及长度
-								}
-								rsp_length = dataGroupRespone(0x0211);			// 电流图
+								rsp_length = dataGroupResponeElec(0x0211);			// 电流图
 								break;
 							}
 							default:
@@ -1133,433 +1072,6 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 			default:
 				break;
 		}
-//		switch(ZB_91_normal->ZB91_framehead.rev_opt)
-//		{
-//			case 0x02:
-//			case 0x42:				// ZigBee上电帧
-//				switch(htons(ZB_91_normal->ZB91_framehead.cluster_ID))
-//				{
-//					case 0x0095:
-//
-//						printf("[提示]有前端ZigBee仪表成功入网\n");
-//
-//						break;
-//					case 0x0013:// 0x0031
-//
-//						printf("[提示]有前端ZigBee脱网仪表上电\n");
-//						break;
-//				}
-//				break;
-//			case 0x61:
-//			case 0x41:
-//			case 0x01:
-//			// 判断该mac地址是否在列表内
-//				// TODO
-//			// 判断16位源网络地址
-//				// TODO
-//			// 判断源端和目的端是否时0xE8 0xE8（A11规定）
-//				if(ZB_91_normal->ZB91_framehead.source_endpoint != 0xE8 ||
-//						ZB_91_normal->ZB91_framehead.destination_endpoint != 0xE8)
-//				{
-//					printf("[提示] 源端 = %d, 目的端 =  %d \n", ZB_91_normal->ZB91_framehead.source_endpoint, ZB_91_normal->ZB91_framehead.destination_endpoint);
-//					break;
-//				}
-//			// 判断簇ID是否是0x00 0x11
-//				if(htons(ZB_91_normal->ZB91_framehead.cluster_ID) != 0x0011)
-//				{
-//					printf("[提示] 簇ID = %d,不等于0x0011(17)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
-//					break;
-//				}
-//			// 判断规范ID是否是A11规定得0x1857传输时使用的 profile ID（建议用中国石油股票代码的后 4 位）
-//				if(htons(ZB_91_normal->ZB91_framehead.profile_ID) != 0x1857)
-//				{
-//					printf("[提示] 规范ID = %d,不等于0x1857(6231)\n", htons(ZB_91_normal->ZB91_framehead.cluster_ID));
-//					break;
-//				}
-//			// 读出收到数据得仪器对应的仪器组号
-//				instrument_group = ZB_91_normal->A11_framehead.instrument_group;
-//			// 判断仪表类型
-//				switch(htons(ZB_91_normal->A11_framehead.instrument_type))
-//				{
-//					case 0x0001:											// 无线一体化载荷位移
-//					{
-//
-//						time_t now_time = time(NULL);							// 读出当前时间秒数
-//						static time_t last_time = 0;
-//
-//
-//						poilwell[instrument_group]->load_displacement.dynagraph.interval = 10;				//设置功图自动测量间隔为30分钟
-//						A11_req_revdata_dynagraph * dynagraph;
-//						dynagraph = (A11_req_revdata_dynagraph *)req;
-//						switch(htons(dynagraph->A11_framehead.data_type))
-//						{
-//							case 0x0000:				//	上传的常规数据
-//
-//								if((last_time == 0) ||(poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order != 0)
-//										|| (now_time > (last_time + poilwell[instrument_group]->load_displacement.dynagraph.interval * 60)))
-//								{
-//									poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order = 0;
-//									last_time = now_time;
-//									// 获取功图采集时间
-//									res = getDynagraphDateTime((void *)poilwell);
-//									if(res != 0)
-//										printf("[错误]获取一体化功图采集时间有误! \n");
-//									// 发送功图采集命令
-//									rsp_length = collectDynagraphRespone(&data_ex);
-//									printf("[提示]开始发送功图采集[组=%d]命令!\n", instrument_group);
-//
-//									// 发送电参采集命令
-//									if((data_ex.flag == 0x3C)&&(data_ex.A11_framehead.instrument_group == dynagraph->A11_framehead.instrument_group))													// 说明有电参
-//									{
-//										res = send_zigbee_msg(ctx, rsp_data, rsp_length);
-//										if(res == -1)
-//										{
-//											printf("[提示]发送一体化功图采[组=%d]集命令失败!\n", instrument_group);
-//											break;
-//										}
-//										rsp_length = collectElecRespone(&data_ex);
-//										printf("[提示]开始发送电参[组=%d]采集命令!\n", instrument_group);
-//									}
-//								}
-//								else
-//								{
-//									// 常规数据应答
-//									rsp_length = conventionalDataRespone();
-//									printf("[提示]发送一体化功图[组=%d]常规数据应答!\n", instrument_group);
-//								}
-//								break;
-//							case 0x0010:				// 上传的常规参数
-//
-//								break;
-//							case 0x0020:				// 上传的功图数据包
-//							{
-//
-//								float tempdata = 0;
-//								A11_req_dynagraph_first *dynagraph_data;
-//								dynagraph_data = (A11_req_dynagraph_first *)req;
-//								if(dynagraph_data->data_serialnum[0] == 0)									// 说明该数据为第一组数据
-//								{
-//									dg_dot = htons(dynagraph_data->dot);
-////									printf("; dynagraph_data->dot =  %d; dg_dot = %d \n", dynagraph_data->dot,  dg_dot);
-//									if(dg_dot <=  250)
-//									{
-//										dg_group = (unsigned char)(dg_dot / 15);
-//										dg_remainder = (unsigned char)(dg_dot %15);
-//									}
-//									else
-//									{
-//										printf("[错误]一体化功图[组=%d]采集总点数[%d] > 250! \n",  instrument_group, dg_dot);
-//										dg_group = 0;
-//										dg_remainder = 0;
-//										break;
-//									}
-//									data_ex.cycle = htons(dynagraph_data->cycle);
-//									data_ex.time_mark = htons(dynagraph_data->time_mark);
-//									data_ex.dot = htons(dynagraph_data->dot);
-//
-//									poilwell[instrument_group]->load_displacement.dynagraph.actual_dot = htons(dynagraph_data->dot);						// 功图实际点数
-//									tempdata  = (6000.0 / htons(dynagraph_data->cycle));																		// 冲次 10ms
-////									printf("周期 = %d   冲次 =  %f \n", htons(dynagraph_data->cycle), tempdata);
-//									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_speed, &tempdata, 4);//sizeof(float));
-//									tempdata = (htons(dynagraph_data->stroke) / 1000.0);
-//									memcpy(&poilwell[instrument_group]->load_displacement.dynagraph.pumping_stroke, &tempdata,4);					// 冲程
-//									printf("冲程 = %d   冲程 =  %f \n", htons(dynagraph_data->stroke), tempdata);
-//									printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!  \n", instrument_group, dynagraph_data->data_serialnum[0]);
-//								}
-//								else
-//								{
-//									A11_req_dynagraph_others *dynagraph_other;
-//
-//									dynagraph_other = (A11_req_dynagraph_others *)req;
-//									dg_num = dynagraph_other->data_serialnum;
-//
-//									if(dg_num <= dg_group)
-//									{
-//										for(n = 0; n < 15; n ++)
-//										{
-//											poilwell[instrument_group]->load_displacement.dynagraph.displacement[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[(15 + n)]);
-//										}
-//										printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dg_num);
-//									}
-//									else
-//									{
-//										for(n = 0; n < dg_remainder; n ++)
-//										{
-//											poilwell[instrument_group]->load_displacement.dynagraph.displacement[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.load[(dg_num - 1) * 15 + n] = htons(dynagraph_other->dynagraph[15 + n]);
-//										}
-//										printf("[提示]接收到一体化功图[组=%d]数据第 [%d] 包!\n", instrument_group, dynagraph_other->data_serialnum);
-//										dgOk2elecFlag = 0x3C;			// 表明全部读回功图数据
-//									}
-////									printf("[提示]接收到一体化功图数据第 [%d] 包!\n",dynagraph_other->data_serialnum);
-//								}
-//								rsp_length = dataGroupRespone(0x0201);			// 一体化功图
-//								if((dgOk2elecFlag == 0x3C)&&(data_ex.flag == 0x3C))
-//								{
-//									dgOk2elecFlag = 0;
-//									res = send_zigbee_msg(ctx, rsp_data, rsp_length);
-//									if(res == -1)
-//									{
-//										printf("[错误]一体化功图[组= %d]数据包有误!\n", instrument_group);
-//										break;
-//									}
-//
-//									rsp_length = readElecRespone(&data_ex);
-//									data_ex.flag = 0;
-//									printf("[提示]开始读取电流图[组=%d]数据包!\n", instrument_group);
-//								}
-//								break;
-//							}
-//							default :
-//								break;
-//						}
-//						break;
-//					}
-//					case 0x0002:											// 无线压力
-//					{
-//						A11_revdata_press_tempreture * wireless_press;
-//						wireless_press = (A11_revdata_press_tempreture *)req;
-//						/* 根据仪器组号和编号判断数据放到哪里
-//						 *
-//						 */
-//						switch(htons(wireless_press->A11_framehead.data_type))
-//						{
-//							case 0x0000:																		//	上传的常规数据
-//								// 厂家代码
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.company_code
-//								= htons(wireless_press->A11_framehead.company_code);
-//								// 仪表类型
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_type
-//								= htons(wireless_press->A11_framehead.instrument_type);
-//								// 仪表组号
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_group
-//								= (wireless_press->A11_framehead.instrument_group);
-//								// 仪表编号
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_no
-//								= (wireless_press->A11_framehead.instument_num);
-//								// 通信效率
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.comm_efficiency
-//								= (uint16_t)(wireless_press->A11_frame_data.comm_efficiency);
-//								// 电池电压
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.bat_vol
-//								= (uint16_t)(wireless_press->A11_frame_data.bat_vol);
-//								// 休眠时间
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.sleep_time
-//								= htons(wireless_press->A11_frame_data.sleep_time);
-//								// 仪表状态
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_sta
-//								= htons(wireless_press->A11_frame_data.instument_sta);
-//								// 工作温度
-////								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.work_temp[0]
-////								= htons(wireless_press->instument_temp[0]) ;
-////								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.work_temp[1]
-////								= htons(wireless_press->instument_temp[1]) ;
-//								// 实时数据
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.realtime_data[0]
-//								= htons(wireless_press->realtime_data[0]) ;
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.realtime_data[1]
-//								= htons(wireless_press->realtime_data[1]) ;
-//								printf("[提示]接收到无线压力[组=%d]常规数据帧!\n", instrument_group);
-//								rsp_length = conventionalDataRespone();
-//								break;
-//							case 0x0010:													// 上传的常规参数
-//								break;
-//							default:
-//								break;
-//						}
-//						break;
-//					}
-//					case 0x0003:											// 无线温度
-//					{
-//						A11_revdata_press_tempreture * wireless_tempreture;
-//						wireless_tempreture = (A11_revdata_press_tempreture *)req;
-//						switch(htons(wireless_tempreture->A11_framehead.data_type))
-//						{
-//							case 0x0000:
-//								// 厂家代码
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.company_code
-//								= htons(wireless_tempreture->A11_framehead.company_code);
-//								// 仪表类型
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_type
-//								= htons(wireless_tempreture->A11_framehead.instrument_type);
-//								// 仪表组号
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_group
-//								= (wireless_tempreture->A11_framehead.instrument_group);
-//								// 仪表编号
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_no
-//								= (wireless_tempreture->A11_framehead.instument_num);
-//								// 通信效率
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.comm_efficiency
-//								= (uint16_t)(wireless_tempreture->A11_frame_data.comm_efficiency);
-//								// 电池电压
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.bat_vol
-//								= (uint16_t)(wireless_tempreture->A11_frame_data.bat_vol);
-//								// 休眠时间
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.sleep_time
-//								= htons(wireless_tempreture->A11_frame_data.sleep_time);
-//								// 仪表状态
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_sta
-//								= htons(wireless_tempreture->A11_frame_data.instument_sta);
-//								// 工作温度
-////								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.work_temp[0]
-////								= htons(wireless_tempreture->instument_temp[0]) ;
-////								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.work_temp[1]
-////								= htons(wireless_tempreture->instument_temp[1]) ;
-//								// 实时数据
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.realtime_data[0]
-//								= htons(wireless_tempreture->realtime_data[0]) ;
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.realtime_data[1]
-//								= htons(wireless_tempreture->realtime_data[1]) ;
-//								printf("[提示]接收到无线温度[组=%d]常规数据帧!\n", instrument_group);
-//								rsp_length = conventionalDataRespone();
-//								break;
-//							case 0x0010:
-//
-//								break;
-//							default:
-//								break;
-//						}
-//						break;
-//					}
-//					case 0x0004:
-//					{// 无线电量
-//						A11_revdata_electrical_parameter *elec_param;
-//						elec_param = (A11_revdata_electrical_parameter *)req;
-//
-//						switch(htons(elec_param->A11_framehead.data_type))
-//						{
-//							case 0x0000:				// 电参得常规应答
-//								memcpy(&data_ex.ZB91_framehead, &elec_param->ZB91_framehead, sizeof(ZB91_revdata_framehead));
-//								memcpy(&data_ex.A11_framehead, &elec_param->A11_framehead, sizeof(A11_data_framehead));
-//								data_ex.flag = 0x3C;
-////								if(elec_param->A11_framehead.company_code == htons(0x0004))	// kaishan
-//								{
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_a[0] = htons(elec_param->current_phase_a[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_a[1] = htons(elec_param->current_phase_a[1]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_b[0] = htons(elec_param->current_phase_b[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_b[1] = htons(elec_param->current_phase_b[1]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_c[0] = htons(elec_param->current_phase_c[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_c[1] = htons(elec_param->current_phase_c[1]);
-//									// 电机工作电压
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_a[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_a[1]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_b[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_b[1]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_c[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_c[1]);
-//									// 功率因数
-//									poilwell[instrument_group]->run_ctrl.elec_param.power_factor[0] = htons(elec_param->power_factor[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.power_factor[1] = htons(elec_param->power_factor[1]);
-//									// 有功功率
-//									poilwell[instrument_group]->run_ctrl.elec_param.moto_p[0] = htons(elec_param->moto_p[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.moto_p[1] = htons(elec_param->moto_p[1]);
-//									// 无功功率
-//									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[0] = htons(elec_param->moto_q[0]);
-//									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[1] = htons(elec_param->moto_q[1]);
-//									printf("[提示]接收到无线电量[组=%d]常规数据帧!\n", instrument_group);
-//
-//									rsp_length = conventionalDataRespone();
-////									ttt = ttt + 1;
-////									printf("ttt = %d \n", ttt);
-////									if(ttt == 22)
-////									{
-////										send_zigbee_msg(ctx, rsp_data, rsp_length);
-////										// 发送电参开始测试命令
-////										printf("[提示]发送电参开始测试命令! \n");
-////										rsp_length = collectElecRespone(&data_ex);
-////									}
-////									if(ttt == 25)
-////									{
-////										ttt = 0;
-////										send_zigbee_msg(ctx, rsp_data, rsp_length);
-////										printf("[提示]发送电参读电流图命令! \n");
-////										rsp_length = readElecRespone(&data_ex);
-////									}
-//								}
-//								break;
-//							case 0x0010:
-//								break;
-//							case 0x0030:				// 上传的电参数据包
-//							{
-//								A11_req_elec_first *elec_data;
-//								elec_data = (A11_req_elec_first *)req;
-//								elec_num = elec_data->data_serialnum;
-//								if(elec_num == 0)									// 说明该数据为第一组数据
-//								{
-//									elec_dot = htons(elec_data->dot);
-////									printf("; dynagraph_data->dot =  %d; dg_dot = %d \n", dynagraph_data->dot,  dg_dot);
-//									if(elec_dot <=  250)
-//									{
-//										elec_group = (unsigned char)(elec_dot / 15);
-//										elec_remainder = (unsigned char)(elec_dot %15);
-//									}
-//									else
-//									{
-//										printf("[错误]电参[组=%d]采集总点数[%d] > 250! \n", instrument_group, dg_dot);
-//										elec_group = 0;
-//										elec_remainder = 0;
-//										break;
-//									}
-//									printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!  \n", instrument_group,elec_num);
-//								}
-//								else
-//								{
-//									A11_req_elec_others *elec_other;
-//
-//									elec_other = (A11_req_elec_others *)req;
-//
-//									if(elec_num <= elec_group)
-//									{
-//										for(n = 0; n < 15; n ++)
-//										{
-//											poilwell[instrument_group]->load_displacement.dynagraph.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
-//										}
-//										printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
-//									}
-//									else
-//									{
-//										for(n = 0; n < dg_remainder; n ++)
-//										{
-//											poilwell[instrument_group]->load_displacement.dynagraph.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
-//											poilwell[instrument_group]->load_displacement.dynagraph.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[15 + n]);
-//										}
-//										printf("[提示]接收到电流图[组=%d]数据第 [%d] 包!\n", instrument_group, elec_num);
-//									}
-////									printf("[提示]接收到电流图数据第 [%d] 包!\n",elec_num);
-//								}
-//								rsp_length = dataGroupRespone(0x0211);			// 电流图
-//								break;
-//							}
-//							default:
-//								break;
-//						}
-//						break;
-//					}
-//					case 0x0005:											// 无线角位移
-//						break;
-//					case 0x0006:											// 无线载荷
-//						break;
-//					case 0x0007:											// 无线扭矩
-//						break;
-//					case 0x0008:											// 无线动液面
-//						break;
-//					case 0x0009:											// 无线一体化转速扭矩
-//						break;
-//					case 0x1F10:											// 控制器(RTU)设备
-//						break;
-//					case 0x1F11:											// 控制器(RTU)设备
-//						break;
-//					default:													// 手操器
-//						break;
-//				}
-//				// 常规数据应答
-////				rsp_length = conventionalDataRespone();
-//				break;
-//			default :
-//				break;
-//		}
 		break;
 	default:
 		break;
@@ -1574,7 +1086,8 @@ static int send_zigbee_msg(modbus_t *ctx, uint8_t *msg, int msg_length)
     int i;
 
 //    msg_length = ctx->backend->send_msg_pre(msg, msg_length);			// 计算校验和返回带校验和的长度
-    printf("<< ");
+    if ((ctx->debug) && (msg_length))
+    	printf("<< ");
     if (ctx->debug) {
         for (i = 0; i < msg_length; i++)
         	 printf("%.2X ", msg[i]);
@@ -1660,7 +1173,7 @@ inline int conventionalDataRespone(unsigned short int sleeptime)
 	ZB_11->ZB11_framehead.frame_ID = 0x00;									//00无ACK  01有ACK
 	memcpy(ZB_11->ZB11_framehead.mac_addr, ZB_91->ZB91_framehead.mac_addr,22);
 	ZB_11->ZB11_framehead.radius = 0x00;
-	ZB_11->ZB11_framehead.send_opt = 0x60;
+	ZB_11->ZB11_framehead.send_opt = 0x00;	// 0x60;
 	memcpy(&ZB_11->A11_framehead, &ZB_91->A11_framehead, sizeof(A11_data_framehead));
 	ZB_11->A11_framehead.instrument_type = htons(0x1F10);						//根据标准规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10
 //				ZB_11->fram_head.data_type = htons(0x0101);									// 参数应答
@@ -1718,11 +1231,9 @@ static int collectDynagraphRespone(data_exchange *datex)
  */
 static int collectElecRespone(data_exchange *datex)
 {
-//	ZB_explicit_RX_indicator *ZB_91;
 	A11_rsp_collect_elec *collect;
 	int data_length = 0;
 	bzero(rsp_data, sizeof(rsp_data));
-//	ZB_91 = (ZB_explicit_RX_indicator *)req_data;
 	collect = (A11_rsp_collect_elec *)rsp_data;
 
 	collect->ZB11_framehead.start_elimiter = 0x7E;
@@ -1742,7 +1253,6 @@ static int collectElecRespone(data_exchange *datex)
 	collect->synchronization_time = htons(datex->synchronization_time);//0x9cF7;//
 	collect->time_interval = htons(datex->time_interval);//0xCC04;//
 	collect->algorithms = datex->algorithms;//0x00;//
-//							collect->company_func = ;
 
 	data_length = sizeof(A11_rsp_collect_elec);
 	collect->check_sum = zigbeeCheck(rsp_data, 3, (data_length - 1));
@@ -1788,17 +1298,50 @@ inline int dataGroupRespone(unsigned short int data_type)
 }
 /*@brief
  * wsf
+ * G28 电参应答数据帧格式
+ * 发送
+ * 数据类型：功图0x0201，无线载荷0x0205，无线位移0x0208，电参0x0211，专项数据0x0231
+ * 取出req_data中的相关数据以ZB11格式放入rsp_data中
+ */
+inline int dataGroupResponeElec(unsigned short int data_type)
+{
+	A11_req_elec_first *ZB_91;
+	A11_rsp_datagroup *rsp_dynagraph;
+	int data_length = 0;
+	memset(rsp_data, 0, sizeof(rsp_data));
+	ZB_91 = (A11_req_elec_first *)req_data;
+	rsp_dynagraph = (A11_rsp_datagroup *)rsp_data;
+
+	rsp_dynagraph->ZB11_framehead.start_elimiter = 0x7E;
+	rsp_dynagraph->ZB11_framehead.length = htons(sizeof(A11_rsp_datagroup) - 4);
+	rsp_dynagraph->ZB11_framehead.frame_type = 0x11;
+	rsp_dynagraph->ZB11_framehead.frame_ID = 0x00;																	// 00无ACK  01有ACK
+	memcpy(rsp_dynagraph->ZB11_framehead.mac_addr, ZB_91->ZB91_framehead.mac_addr, 18);
+	rsp_dynagraph->ZB11_framehead.radius = 0x00;
+	rsp_dynagraph->ZB11_framehead.send_opt = 0x00;//0x60;
+
+	memcpy(&rsp_dynagraph->A11_framehead, &ZB_91->A11_framehead, sizeof(A11_data_framehead));
+	rsp_dynagraph->A11_framehead.instrument_type =  htons(0x1F10);						// 根据A11规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10
+	rsp_dynagraph->A11_framehead.data_type = htons(data_type);									// 根据A11规范，RTU应答一体化功图应答功图数据类型为0x0201
+
+	rsp_dynagraph->data_serialnum = ZB_91->data_serialnum;
+
+	data_length = sizeof(A11_rsp_datagroup);
+	rsp_dynagraph->check_sum = zigbeeCheck(rsp_data,3,(data_length - 1));
+	return data_length;
+}
+/*@brief
+ * wsf
  * G25 读电流图数据命令帧格式
  * 取出req_data中的相关数据以ZB11格式放入rsp_data中
  * 发送
  */
 static int readElecRespone(data_exchange *datex)
 {
-//	ZB_explicit_RX_indicator *ZB_91;
 	A11_rsp_currentchart *readcurrent;
 	int data_length = 0;
-	memset(rsp_data, 0, sizeof(rsp_data));
-//	ZB_91 = (ZB_explicit_RX_indicator *)req_data;
+	bzero(rsp_data, sizeof(rsp_data));
+//	memset(rsp_data, 0, sizeof(rsp_data));
 	readcurrent = (A11_rsp_currentchart *)rsp_data;
 	readcurrent->ZB11_framehead.start_elimiter = 0x7E;
 	readcurrent->ZB11_framehead.length = htons(sizeof(A11_rsp_currentchart) - 4);

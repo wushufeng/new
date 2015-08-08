@@ -12,7 +12,7 @@
 # include <pthread.h>
 
 
-
+#include "./log/rtulog.h"
 #include "def.h"
 #include "database/database.h"
 #include "./A11_sysAttr/a11sysattr.h"
@@ -24,6 +24,7 @@
 #include "common/common.h"
 #include "./managerDB/ManagerDB.h"
 
+
 #define MAXBUFSIZE 512
 char AppPathFileName[MAXBUFSIZE];
 char AppPath[MAXBUFSIZE];
@@ -32,6 +33,7 @@ char AppOptinFile[MAXBUFSIZE];//配置文件路径
 char SysIniFile[MAXBUFSIZE];//系统ini文件
 
 
+//extern exchangebuffer *pexbuffer[17];
 E1_sys_attribute *psysattr;
 //extern oil_well *poilwell[16];
 //pthread_mutex_t holdingReg_mutex;
@@ -42,7 +44,22 @@ int main(int argc, char *argv[])
 	char cCh;
 	char bDoExit ;
 	int n;
-
+	// zlog
+	if((res = Zlog_init()) != 0)
+		return res;
+	if((res = Zlog_get_category()) != 0)
+		return res;
+//	res = zlog_init("rtulog.conf");
+//	if (res) {
+//		printf("RTU日志初始化失败\n");
+//		return -1;
+//	}
+//	c = zlog_get_category("my_cat");
+//	if (!c) {
+//		printf("获取RTU日志类型失败\n");
+//		zlog_fini();
+//		return -2;
+//	}
 ////	 创建holdingreg全局锁
 //    res = pthread_mutex_init(&holdingReg_mutex,NULL);
 //    if(res != 0)
@@ -51,58 +68,65 @@ int main(int argc, char *argv[])
 //        exit(EXIT_FAILURE);
 //    }
 ////     开辟20000个空间,用于mb保持寄存器
-
-	getAppPathFileName((char*)AppPathFileName);
-	getAppPath((char*)AppPath);
-	getAppName((char*)AppFileName);
-
+	zlog_info(c, "**************RTU程序启动*****************");
+	zlog_info(c, "RTU日志模块初始化完毕");
+//	zlog_debug(c, "MBMapping数据空间错误!");
+//	zlog_warn(c, "A11配置文件不存在，创建新文件并写入默认配置");
+//	zlog_error(c, "MBMapping数据空间错误!");
+//	getAppPathFileName((char*)AppPathFileName);
+//	getAppPath((char*)AppPath);
+//	getAppName((char*)AppFileName);
 	if(mbMappingNew() == 0)
-		printf("[提示]MBMapping数据空间准备就绪!\n");
+		zlog_info(c, "MBMapping数据空间准备就绪!");
 	else
-		printf("[错误]MBMapping数据空间错误!\n");
+		zlog_error(c, "MBMapping数据空间错误!");
+
 	// 加载A11数据,该指针指向mb保持寄存器
 	psysattr = LoadConfigA11();
-//	psysattr->baseinfo.ram_vol = 0x1234;
-	printf("[提示]启动Database线程!\n");
+	zlog_info(c, "启动数据同步线程!");
 	res = createDatabaseThread();
 	if(res != 0)
 	{
-		printf("[错误]启动Database失败!\n");
+		zlog_error(c, "启动数据同步失败!");
 		exit(EXIT_FAILURE);
 	}
-	printf("[提示]创建sqlite库!\n");
-	openDatabase("./RTU.db");
-	createDatabase(DBfd);
-	closeDatabase(DBfd);
-	printf("[提示] 完成!\n");
+//	printf("[提示]创建sqlite库!\n");
+//	testCreateTables();
+//	databaseInsert(pexbuffer[0]);
+//	showRecordsByTime(0);
+//	printf("[提示] 数据库调试完成!\n");
 	/* @brief
 	 * wsf
 	 * 创建aidi线程
 	 */
-	printf("[提示]启动AIDI线程!\n");
-	res = createAidiThread();
-    if(res != 0)
-    {
-        perror("[错误]AIDI线程创建失败!\n");
-        exit(EXIT_FAILURE);
-    }
+//	if(0)
+	{
+		zlog_info(c, "启动AIDI线程!");
+		res = createAidiThread();
+		if(res != 0)
+		{
+			zlog_error(c, "AIDI线程创建失败!");
+			exit(EXIT_FAILURE);
+		}
+	}
 	/*@brief
 	 * wsf
 	 * TCP
 	 */
 		//////////////////////////////////////////////////////////
+//    if(0)
 	if(psysattr->commparam.communication_protocols == CP_MB_TCPIP)
 	{
-		printf("[提示]Net1000正在初始化...\n");
+		zlog_info(c, "Net1000正在初始化...");
 		res = net1000Init((void *) psysattr);
 		if(res == 0)
 		{
-			printf("[提示]Net1000初始化完成!\n");
-			printf("[提示]启动Net1000线程!\n");
+			zlog_info(c, "Net1000初始化完成!");
+			zlog_info(c, "启动Net1000线程!");
 			res = createNet1000Thread();
 		    if(res != 0)
 		    {
-		        perror("[错误]Net1000线程创建失败!\n");
+		    	zlog_error(c, "Net1000线程创建失败!");
 		        exit(EXIT_FAILURE);
 		    }
 		}
@@ -112,18 +136,19 @@ int main(int argc, char *argv[])
 	 * wsf
 	 * Serial232
 	 */
+//	if(0)
 	if(psysattr->commparam.communication_protocols == CP_MB_RTU)
 	{
-		printf("[提示]Serial232正在初始化...\n");
+		zlog_info(c, "Serial232正在初始化...");
 		res = serial232Init((void *)psysattr);
 		if(res == 0)
 		{
-			printf("[提示]Serial232初始化完成!\n");
-			printf("[提示]启动Serial232线程!\n");
+			zlog_info(c, "Serial232初始化完成!");
+			zlog_info(c, "启动Serial232线程!\n");
 			res = createSerial232Thread();
 			if(res != 0)
 			{
-				perror("Serial232线程创建失败!\n");
+				zlog_error(c, "Serial232线程创建失败!");
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -135,16 +160,16 @@ int main(int argc, char *argv[])
 	 */
 	if(psysattr->commparam.downlink_comm_interface == DCI_ZIGBEE)
 	{
-		printf("[提示]ZigBee正在初始化...\n");
+		zlog_info(c, "ZigBee正在初始化...");
 		res = serialZigbeeInit((void *) psysattr);
 		if(res == 0)
 		{
-			printf("[提示]ZigBee初始化完成!\n");
-			printf("[提示]启动ZigBee线程!\n");
+			zlog_info(c, "ZigBee初始化完成!");
+			zlog_info(c, "启动ZigBee线程!");
 			res = createZigbeeThread();
 		    if(res != 0)
 		    {
-		        perror("ZigBee线程创建失败!\n");
+		    	zlog_error(c, "ZigBee线程创建失败!");
 		        exit(EXIT_FAILURE);
 		    }
 		}
@@ -170,7 +195,6 @@ int main(int argc, char *argv[])
         	break;
         case 'q':
             bDoExit = 1;
-            printf("[提示]正在释放内存...\n");
             break;
         case 'h':
             printf( "金时P90A_newRTU帮助:\n" );
@@ -197,6 +221,15 @@ int main(int argc, char *argv[])
         }
     }
     while( !bDoExit );
+	// 取消并join数据库线程
+	databaseThreadCancel();
+	AIDIThreadCancel();
+	net1000ThreadCancel();
+	serialZigbeeCancel();
+//	serial232ThreadCancel();
+//	serialGPRSThreadCancel();
+
+
 //	if(psysattr != NULL)
 //		free(psysattr);
 	for(n = 0; n < 16; n ++)
@@ -204,10 +237,12 @@ int main(int argc, char *argv[])
 		if(mb_mapping[n] !=NULL)
 			modbus_mapping_free(mb_mapping[n]);
 	}
+	zlog_info(c, "正在释放内存...");
 	net1000Free();
-	serial232Free();
+//	serial232Free();
 	serialZigbeeFree();
 	serialGprsFree();
-	printf("[提示]释放完毕,程序退出!\n");
-	return 1;
+	zlog_info(c, "**************RTU程序正常退出*****************");
+	zlog_fini();
+	exit(EXIT_SUCCESS);
 }

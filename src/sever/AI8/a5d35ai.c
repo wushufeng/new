@@ -40,7 +40,7 @@ We can calculate the result: 948 x 3222 = 3.0V
 //#include "../../modbus/modbus.h"
 #include "../../A11_sysAttr/a11sysattr.h"
 #include "a5d35ai.h"
-
+#include "../../log/rtulog.h"
 
 extern E1_sys_attribute *psysattr;
 unsigned short int ai_data[10];
@@ -50,7 +50,34 @@ static int aidiThreadFunc(void *arg);
 static void modbus_set_float_swapped(float f, unsigned short int *dest);
 static int  a5d3ad_get_ad(unsigned short int *dest, int index, unsigned short int nb_bits);
 
+int AIDIThreadCancel(void)
+{
+	int res;
+	void * thread_result;
 
+	int kill_rc = pthread_kill(aidi_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
+	zlog_info(c, "正在取消AIDI线程...");
+	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
+		zlog_warn(c, "AIDI线程不存在或者已经退出");
+	else if(kill_rc == EINVAL)		// 信号不合法：EINVAL
+		zlog_warn(c, "非法信号");
+	else
+	{
+		res = pthread_cancel(aidi_thread);
+		if(res != 0)	{
+			zlog_error(c, "取消AIDI线程失败-%d", res);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	zlog_info(c, "正在等待AIDI线程结束...");
+	res = pthread_join(aidi_thread, &thread_result);
+	if(res != 0)	{
+		zlog_error(c, "等待AIDI线程结束失败");
+		exit(EXIT_FAILURE);
+	}
+	return 0;
+}
 
 int createAidiThread(void)
 {
@@ -59,9 +86,7 @@ int createAidiThread(void)
 	res = pthread_create(&aidi_thread, NULL, (void *)&aidiThreadFunc, NULL);
     if(res != 0)
     {
-//    	fprintf(stderr, "[错误]AIDI线程创建失败: %s\n", modbus_strerror(errno));
-    	printf("[错误]AIDI线程创建失败!\n");
-//        perror("Thread creation failed");
+    	zlog_error(c, "AIDI线程创建失败-%d", res);
         return (EXIT_FAILURE);
     }
 	return EXIT_SUCCESS;
@@ -71,7 +96,18 @@ static int aidiThreadFunc(void *arg)
 	float tempdata = 0;
 	unsigned short int voltage_scale;
 	unsigned short int tempun16 = 0;
-//	int n;
+	int res;
+
+	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(res != 0)	{
+		zlog_error(c, "AI8线程pthread_setcancelstate失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
+	res = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	if(res != 0)	{
+		zlog_error(c, "AI8线程pthread_setcanceltype失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
 	for(;;)
 	{
 //		a5d3ad_get_ad(ai_data, 0, 10);
@@ -107,7 +143,8 @@ static int aidiThreadFunc(void *arg)
 		usleep(100);				// 100ms 延时
 //		sleep(10);
 	}
-	return 0;
+
+	pthread_exit(0);
 }
 
 

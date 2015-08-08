@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "a11sysattr.h"
+#include "../log/rtulog.h"
 #include "../myfunction/myfun.h"
 #include "../sever/sysdatetime/getsysdatetime.h"
 #include "../inifile/inifile.h"
@@ -36,17 +37,17 @@ E1_sys_attribute* LoadConfigA11(void)
 	E1_sys_attribute *psysattr = (E1_sys_attribute *)mb_mapping[0]->tab_registers;
 	res = 0;
 	if (IsFileExist(A11filename)) {
-        printf("[提示]A11配置文件不存在，创建新文件并写入默认配置\n");
-        if(createA11Configfile(psysattr,A11filename) == 0)
-        	printf("[提示]创建A11配置成功，并读入默认配置\n");
+		zlog_warn(c, "A11配置文件不存在，创建新文件并写入默认配置");
+		if(createA11Configfile(psysattr,A11filename) == 0)
+        	zlog_info(c, "创建A11配置成功，并读入默认配置");
         else
-        	printf("[错误]创建A11配置失败，从程序读入默认配置\n");
+        	zlog_error(c, "创建A11配置失败，从程序读入默认配置");
     }
 	else
 	{
 		res = getA11Configure(psysattr);
 		if(res  == 0)
-			printf("[提示]成功从配置文件读入默认配置\n");
+			zlog_info(c, "成功从配置文件读入默认配置");
 	}
 	if(res == 0)
 	{
@@ -57,9 +58,8 @@ E1_sys_attribute* LoadConfigA11(void)
 			case WST_VALVE_VAULT:											// 阀室
 				break;
 			case WST_OIL_WELL:													// 油井（生产井）
-				printf("[提示]当前配置为得应用井站类型为\"油井\"(001)\n");
-				printf("[提示]初始化数据格式为油井格式\n");
-
+				zlog_info(c, "当前配置为得应用井站类型为\"油井\"(001)");
+				zlog_info(c, "初始化数据格式为油井格式");
 				for(n = 0; n < 17; n ++)
 					poilwell[n] = (oil_well *)(mb_mapping[n]->tab_registers + sizeof(E1_sys_attribute) / 2);
 

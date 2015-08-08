@@ -19,6 +19,7 @@
 #include "../../database/database.h"
 #include "../../A11_sysAttr/a11sysattr.h"
 #include "Net1000.h"
+#include "../../log/rtulog.h"
 
 int sockfd;
 modbus_t *ctx_net1000;
@@ -43,7 +44,16 @@ static int net1000ThreadFunc(void *arg)
 	int net_slave;
 	int net_offset;
 //	modbus_tcp_t *ctx_tcp = ctx_net1000->backend_data;
-
+	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Net1000线程pthread_setcancelstate失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
+	res = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Net1000线程pthread_setcanceltype失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
 	 if (use_backend_net1000 == TCP)
 	 {
 			switch(comm_mode)					// 主站通信方式
@@ -55,17 +65,17 @@ static int net1000ThreadFunc(void *arg)
 
 					break;
 				case MCM_TCP_SERVER:
-					printf("[提示]Net1000正在尝试连接服务器...\n");
-					 sockfd = modbus_tcp_client_socket(ctx_net1000);								// TCP client
-				 	 res = modbus_tcp_connect(ctx_net1000);											// TCP client
+					zlog_info(c, "Net1000正在尝试连接服务器...");
+					sockfd = modbus_tcp_client_socket(ctx_net1000);								// TCP client
+					res = modbus_tcp_connect(ctx_net1000);											// TCP client
 //				 	 if(res == -1)
 //				 	 {
 //				 		 printf("[错误]Net1000无法连接主站%s，服务端口: %d\n",ctx_tcp->ip, ctx_tcp->port);
 //				 	 }
 					break;
 				case MCM_TCP_CLIENT:
-					printf("[提示]Net1000正在监听本地服务端口...\n");
-					 sockfd = modbus_tcp_listen(ctx_net1000, 1);										// TCP server
+					zlog_info(c, "Net1000正在监听本地服务端口...");
+					sockfd = modbus_tcp_listen(ctx_net1000, 1);										// TCP server
 					break;
 				case MCM_UDP_SERVER:
 
@@ -137,7 +147,7 @@ static int net1000ThreadFunc(void *arg)
 		    net_slave = query_net1000[net_offset - 1];
 	        if((net_slave < 1) ||((net_slave > 16) && (net_slave != 128)))
 	        {
-	        	printf("[提示]Modbus TCP device ID = %d, 不在范围内ID = 128|| 1 <= ID <= 16\n", net_slave);
+	        	zlog_warn(c, "Modbus TCP device ID = %d, 不在范围内ID = 128|| 1 <= ID <= 16", net_slave);
 	        	goto disconnect;//break;
 	        }
 	        if(net_slave == 128)
@@ -152,7 +162,7 @@ static int net1000ThreadFunc(void *arg)
 		 close(ctx_net1000->s);
 		        sleep(5);
     }
-    return 1;
+    pthread_exit(0);
 }
 int createNet1000Thread(void)
 {
@@ -160,8 +170,7 @@ int createNet1000Thread(void)
 	res = pthread_create(&net1000_thread, NULL, (void*)&net1000ThreadFunc, NULL);
     if(res != 0)
     {
-    	fprintf(stderr, "Thread creation failed: %s\n", modbus_strerror(errno));
-//        perror("Thread creation failed");
+    	zlog_error(c, "创建Net1000线程失败:%s", modbus_strerror(errno));
         return (EXIT_FAILURE);
     }
 	return EXIT_SUCCESS;
@@ -188,7 +197,7 @@ int net1000Init(void *obj)
 							psysattr->commparam.master_ip_address[2],
 							psysattr->commparam.master_ip_address[3]);
 			port = psysattr->commparam.master_port;
-			printf("[提示]Net1000作为客户端工作在TCP模式下，连接主站：%s, 服务端口:%d\n", ip, port);
+			zlog_info(c, "Net1000作为客户端工作在TCP模式下，连接主站：%s, 服务端口:%d", ip, port);
 			break;
 		case MCM_TCP_CLIENT:
 	    	sprintf(ip,"%d.%d.%d.%d",psysattr->commparam.ip_address[0],
@@ -196,7 +205,7 @@ int net1000Init(void *obj)
 					psysattr->commparam.ip_address[2],
 					psysattr->commparam.ip_address[3]);
 	    	port = psysattr->commparam.tcp_port;
-	    	printf("[提示]Net1000作为服务器工作在TCP模式下，本地IP：%s, 服务端口:%d\n", ip, port);
+	    	zlog_info(c, "Net1000作为服务器工作在TCP模式下，本地IP：%s, 服务端口:%d\n", ip, port);
 			break;
 		case MCM_UDP_SERVER:
 
@@ -232,7 +241,7 @@ int net1000Init(void *obj)
         query_net1000 = malloc(MODBUS_TCP_MAX_ADU_LENGTH);
         if(query_net1000 == NULL)
         {
-        	fprintf(stderr, "Failed to allocate the query_net1000: %s\n", modbus_strerror(errno));
+        	zlog_error(c, "为Net1000分配内存失败: %s", modbus_strerror(errno));
 //        	perror("Malloc query_net1000 failed");
         	return -1;
         }
@@ -251,6 +260,34 @@ int net1000Init(void *obj)
 //        modbus_free(ctx_net1000);
 //        return -1;
 //    }
+	return 0;
+}
+int net1000ThreadCancel(void)
+{
+	int res;
+	void * thread_result;
+
+	int kill_rc = pthread_kill(net1000_thread, 0);		// 使用pthread_kill函数发送信号0判断线程是否还在
+	zlog_info(c, "正在取消Net1000线程...");
+	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
+		zlog_warn(c, "Net1000线程不存在或者已经退出");
+	else if(kill_rc == EINVAL)		// 信号不合法：EINVAL
+		zlog_warn(c, "非法信号");
+	else
+	{
+		res = pthread_cancel(net1000_thread);
+		if(res != 0)	{
+			zlog_error(c, "取消Net1000线程失败-%d", res);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	zlog_info(c, "正在等待Net1000线程结束...");
+	res = pthread_join(net1000_thread, &thread_result);
+	if(res != 0)	{
+		zlog_error(c, "等待Net1000线程结束失败-%d", res);
+		exit(EXIT_FAILURE);
+	}
 	return 0;
 }
 void net1000Free()

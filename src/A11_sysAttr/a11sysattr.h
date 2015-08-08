@@ -83,7 +83,7 @@ typedef struct
 #define		C_BAUD_19200			4	// 19200
 #define		C_BAUD_38400			5	// 38400
 #define		C_BAUD_57600			6	// 57600
-#define		C_BAUD_OTHER			7	// 其他波特率
+#define		C_BAUD_OTHER			7	// 其他波特率 115200
 /*@brief
  * wsf
  * 串口数据位（comm_databit）预定义

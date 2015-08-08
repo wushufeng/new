@@ -33,13 +33,13 @@ typedef struct
 	short int local_second;
 }sys_local_time;
 
-sys_local_date* getSysLocalDate(void);
+sys_local_date* getSysLocalDate(time_t syncTime);
 //int setSyslocaldate(void *obj);
-sys_local_time* getSysLocalTime(void);
+sys_local_time* getSysLocalTime(time_t syncTime);
 
 int getSysLocalDateTime(void *obj);
 
-int getDynagraphDateTime(void *obj);
+int getDynagraphDateTime(void *obj, time_t syncTime);
 
 unsigned char DEC2BCD(const unsigned char decDat);
 unsigned char BCD2DEC(unsigned char bcdDat);

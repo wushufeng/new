@@ -15,10 +15,11 @@
 //#include "../../modbus/modbus.h"
 #include "../../database/database.h"
 #include "../../modbus/modbus-private.h"
+#include "../../log/rtulog.h"
 
 
-#define 	SERIAL232			"/dev/ttyS2"
-//#define 	SERIAL232			"/dev/ttyUSB0"
+//#define 	SERIAL232			"/dev/ttyS2"
+#define 	SERIAL232			"/dev/ttyUSB1"
 
 modbus_t *ctx_serial232;
 pthread_t serial232_thread;
@@ -40,6 +41,19 @@ static int serial232ThreadFunc(void *arg)
 {
 	int serial_slave;
 	int serial_offset;
+	int res;
+
+	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Serial232线程pthread_setcancelstate失败");
+		exit(EXIT_FAILURE);
+	}
+	res = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	if(res != 0)	{
+		zlog_error(c, "Serial232线程pthread_setcanceltype失败");
+		exit(EXIT_FAILURE);
+	}
+
     rc = modbus_connect(ctx_serial232);
     if (rc == -1) {
         fprintf(stderr, "[错误]Serial232接口不能连接! %s\n", modbus_strerror(errno));
@@ -72,7 +86,7 @@ static int serial232ThreadFunc(void *arg)
             break;
         }
     }
-	return 0;
+	pthread_exit(0);
 }
 int createSerial232Thread(void)
 {
@@ -179,6 +193,24 @@ int serial232Init(void *obj)
 
     header_length = modbus_get_header_length(ctx_serial232);
     modbus_set_debug(ctx_serial232, TRUE);
+	return 0;
+}
+int serial232ThreadCancel(void)
+{
+	int res;
+	void * thread_result;
+	zlog_info(c, "正在取消Serial232线程");
+	res = pthread_cancel(serial232_thread);
+	if(res != 0)	{
+		zlog_error(c, "Serial232线程取消失败");
+		exit(EXIT_FAILURE);
+	}
+	zlog_info(c, "正在joinSerial232线程");
+	res = pthread_join(serial232_thread, &thread_result);
+	if(res != 0)	{
+		zlog_error(c, "Serial232线程join失败");
+		exit(EXIT_FAILURE);
+	}
 	return 0;
 }
 void serial232Free()

@@ -46,11 +46,13 @@
 //    return 0;
 //}
 
-sys_local_date* getSysLocalDate(void)
+sys_local_date* getSysLocalDate(time_t syncTime)
 {
     sys_local_date *p_sys_date;
 
     time_t nowtime = time(NULL);
+    if(syncTime)
+    	nowtime = syncTime;
     struct tm *now = localtime(&nowtime);
     char temp = 0;
 
@@ -136,13 +138,15 @@ sys_local_date* getSysLocalDate(void)
 //
 //	return 0;
 //}
-sys_local_time* getSysLocalTime(void)
+sys_local_time* getSysLocalTime(time_t syncTime)
 {
 	sys_local_time *p_sys_time;
 
 //    char sys_time[9];
 
     time_t nowtime = time(NULL);
+    if(syncTime)
+    	nowtime = syncTime;
     struct tm *now = localtime(&nowtime);
     char temp = 0;
 
@@ -190,7 +194,7 @@ int getSysLocalDateTime(void *obj)
 	E1_sys_attribute *psysattr = (E1_sys_attribute *)obj;
 	sys_local_date *pLocalDate;
 	sys_local_time *pLocalTime;
-	pLocalDate = getSysLocalDate();
+	pLocalDate = getSysLocalDate(0);
 	if(pLocalDate == NULL)
 		return -1;
 	psysattr->baseinfo.sys_date [0] = pLocalDate->local_year;
@@ -198,7 +202,7 @@ int getSysLocalDateTime(void *obj)
 	psysattr->baseinfo.sys_date [2] = pLocalDate->local_day;
 	if(pLocalDate != NULL)
 		free(pLocalDate);
-	pLocalTime = getSysLocalTime();
+	pLocalTime = getSysLocalTime(0);
 	if(pLocalTime == NULL)
 		return -1;
 	psysattr->baseinfo.sys_time [0] = pLocalTime->local_hour;
@@ -215,12 +219,12 @@ int getSysLocalDateTime(void *obj)
 		free(pLocalTime);
 	return 0;
 }
-int getDynagraphDateTime(void *obj)
+int getDynagraphDateTime(void *obj, time_t syncTime)
 {
 	oil_well *ptr = (oil_well *)obj;
 	sys_local_date *pLocalDate;
 	sys_local_time *pLocalTime;
-	pLocalDate = getSysLocalDate();
+	pLocalDate = getSysLocalDate(syncTime);
 	if(pLocalDate == NULL)
 		return -1;
 	ptr->load_displacement.dynagraph.collection_datetime [0] = pLocalDate->local_year;
@@ -228,7 +232,7 @@ int getDynagraphDateTime(void *obj)
 	ptr->load_displacement.dynagraph.collection_datetime [2] = pLocalDate->local_day;
 	if(pLocalDate != NULL)
 		free(pLocalDate);
-	pLocalTime = getSysLocalTime();
+	pLocalTime = getSysLocalTime(syncTime);
 	if(pLocalTime == NULL)
 		return -1;
 	ptr->load_displacement.dynagraph.collection_datetime [3] = pLocalTime->local_hour;

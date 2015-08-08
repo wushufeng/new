@@ -11,7 +11,7 @@
 int serialZigbeeInit(void *obj);
 int createZigbeeThread(void);
 void serialZigbeeFree();
-
+int serialZigbeeCancel(void);
 
 
 /* @brief

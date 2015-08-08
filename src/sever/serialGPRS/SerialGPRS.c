@@ -23,7 +23,7 @@
 #include "../../database/database.h"
 #include "../../modbus/modbus-private.h"
 #include "../sysdatetime/getsysdatetime.h"
-
+#include "../../log/rtulog.h"
 
 #define 	GPRSDEVICE			"/dev/ttyS4"
 //#define 	GPRSDEVICE			"/dev/ttyUSB0"
@@ -52,6 +52,26 @@ typedef enum {
 static int gprsThreadFunc(void *arg);
 static int receive_msg_gprs(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type);
 static int gprs_reply(modbus_t *ctx,  uint8_t *req, int req_length);
+
+
+int serialGPRSThreadCancel(void)
+{
+	int res;
+	void * thread_result;
+	zlog_info(c, "正在取消SerialGPRS线程");
+	res = pthread_cancel(gprs_thread);
+	if(res != 0)	{
+		zlog_error(c, "SerialGPRS线程取消失败");
+		exit(EXIT_FAILURE);
+	}
+	zlog_info(c, "正在joinSerialGPRS线程");
+	res = pthread_join(gprs_thread, &thread_result);
+	if(res != 0)	{
+		zlog_error(c, "SerialGPRS线程join失败");
+		exit(EXIT_FAILURE);
+	}
+	return 0;
+}
 
 /* @brief
  * wsf
@@ -178,12 +198,23 @@ int createGprsThread(void)
 static int gprsThreadFunc(void *arg)
 {
 	int rc;
-
+	int res;
+	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	if(res != 0)	{
+		zlog_error(c, "GPRS线程pthread_setcancelstate失败");
+		exit(EXIT_FAILURE);
+	}
+	res = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
+	if(res != 0)	{
+		zlog_error(c, "GPRS线程pthread_setcanceltype失败");
+		exit(EXIT_FAILURE);
+	}
     rc = modbus_connect(ctx_gprs);
     if (rc == -1) {
-        fprintf(stderr, "[错误]GPRS不能连接! %s\n", modbus_strerror(errno));
-        modbus_free(ctx_gprs);
-        return -1;
+    	zlog_error(c, "GPRS不能连接! %s\n", modbus_strerror(errno));
+//        modbus_free(ctx_gprs);
+//        return -1;
+    	pthread_exit(0);
     }
     for(;;)
     {
@@ -209,7 +240,7 @@ static int gprsThreadFunc(void *arg)
 sl:
 	sleep(1);
 	}
-	return 0;
+	pthread_exit(0);
 }
 static int receive_msg_gprs(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
 {

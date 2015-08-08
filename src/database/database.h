@@ -69,7 +69,7 @@ typedef struct
 
 int mbMappingNew(void);
 
+int databaseThreadCancel(void);
 int createDatabaseThread(void);
-
 int mbWriteSigleRegister(uint16_t address, int data);
 #endif /* SRC_DATABASE_DATABASE_H_ */

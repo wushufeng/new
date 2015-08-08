@@ -601,7 +601,7 @@ int modbus_tcp_accept(modbus_t *ctx, int *socket)
 //        printf("The client connection from %s is accepted\n",
 //               inet_ntoa(addr.sin_addr));
         printf("[提示]Net1000接收到来自%s:%d客户端的连接\n",
-               inet_ntoa(addr.sin_addr), addr.sin_port);
+        inet_ntoa(addr.sin_addr), addr.sin_port);
     }
 
     return ctx->s;

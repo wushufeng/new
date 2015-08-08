@@ -11,5 +11,5 @@
 int serialGprsInit(void *obj);
 int createGprsThread(void);
 void serialGprsFree();
-
+int serialGPRSThreadCancel(void);
 #endif /* SRC_SEVER_SERIALGPRS_SERIALGPRS_H_ */
