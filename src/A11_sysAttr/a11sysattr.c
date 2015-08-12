@@ -22,8 +22,9 @@
 extern modbus_mapping_t *mb_mapping[17];
 
 const char *A11filename = "./A11config.ini";
-int basesInfoInit(RTU_baseinfo * p_baseinfo);
-int commParamInit(communicatios_parameters * p_commparam);
+static int basesInfoInit(RTU_baseinfo * p_baseinfo);
+static int commParamInit(communicatios_parameters * p_commparam);
+//static int laodDisplacementInit(load_displacement * obj);
 int createA11Configfile(E1_sys_attribute * psysattr,const char *filename);
 int getA11Configure(E1_sys_attribute *psysattr);
 static int manufacturersParamInit(manufacturers_of_custom * pobj);
@@ -196,6 +197,8 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 	basesInfoInit(&psysattr->baseinfo);
 	// 用默认值初始化commparam
 	commParamInit(&psysattr->commparam);
+//	// 用默认值初始化load_displacement
+//	laodDisplacementInit(&psysattr->dynagraph);
 	// 将内从中的baseinfo参数写入配置文件
 	sprintf(str,"%d",psysattr->baseinfo.password);
 	if (!write_profile_string("rtuBaseInfo","password",str,A11filename)) return -1;
@@ -258,23 +261,27 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 			psysattr->commparam.ip_address[3]);
 	if (!write_profile_string("commParam","ip_address",str,A11filename)) return -1;
 
-	sprintf(str,"%d",psysattr->commparam.comm_duplex);
-	if (!write_profile_string("commParam","comm_duplex",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.comm_paritybit);
-	if (!write_profile_string("commParam","comm_paritybit",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.comm_stopbit);
-	if (!write_profile_string("commParam","comm_stopbit",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.comm_databit);
-	if (!write_profile_string("commParam","comm_databit",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.comm_baudrate);
-	if (!write_profile_string("commParam","comm_baudrate",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.terminal_comm_address);
-	if (!write_profile_string("commParam","terminal_comm_address",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.communication_protocols);
-	if (!write_profile_string("commParam","communication_protocols",str,A11filename)) return -1;
-	sprintf(str,"%d",psysattr->commparam.communication_mode);
-	if (!write_profile_string("commParam","communication_mode",str,A11filename)) return -1;
-
+	sprintf(str,"%d", psysattr->commparam.comm_duplex);
+	if (!write_profile_string("commParam", "comm_duplex",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.comm_paritybit);
+	if (!write_profile_string("commParam", "comm_paritybit",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.comm_stopbit);
+	if (!write_profile_string("commParam", "comm_stopbit",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.comm_databit);
+	if (!write_profile_string("commParam", "comm_databit",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.comm_baudrate);
+	if (!write_profile_string("commParam", "comm_baudrate",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.terminal_comm_address);
+	if (!write_profile_string("commParam", "terminal_comm_address",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.communication_protocols);
+	if (!write_profile_string("commParam", "communication_protocols",str,A11filename)) return -1;
+	sprintf(str,"%d", psysattr->commparam.communication_mode);
+	if (!write_profile_string("commParam", "communication_mode",str,A11filename)) return -1;
+	// 将内存中的laod_displacement参数写入配置文件
+//	sprintf(str, "%d", psysattr->dynagraph.set_dot);
+//	if (!write_profile_string("laod_displacement","set_dot",str,A11filename)) return -1;
+//	sprintf(str, "%d",psysattr->dynagraph.interval);
+//	if (!write_profile_string("laod_displacement","interval",str,A11filename)) return -1;
 	return 0;
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -288,7 +295,7 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
  * E.1 远程终端单元系统属性数据存储地址
  * 一,RTU基本信息
  */
-int basesInfoInit(RTU_baseinfo * p_baseinfo)
+static int basesInfoInit(RTU_baseinfo * p_baseinfo)
 {
 	p_baseinfo->well_station_type = WST_OIL_WELL;
 	p_baseinfo->dev_company = 34;
@@ -317,7 +324,7 @@ int basesInfoInit(RTU_baseinfo * p_baseinfo)
  * 二, 通信类参数
  * 地址范围40031-40299
  */
-int commParamInit(communicatios_parameters * p_commparam)
+static int commParamInit(communicatios_parameters * p_commparam)
 {
 	p_commparam->communication_mode = CM_WIRELESS_BRIDGES;
 	p_commparam->communication_protocols = CP_MB_TCPIP;
@@ -430,6 +437,13 @@ int electricalParamInit(electrical_parameter * obj)
  * E.3 油井示功图采集数据存储地址表
  *
  */
+//static int laodDisplacementInit(load_displacement * obj)
+//{
+//	obj->interval = 10;
+//	obj->set_dot = 200;
+////	obj->manul_collection_order = 0;
+//	return 0;
+//}
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // 表 E.4 油井功能参数控制指令存储地址表
 // 地址范围43001-49999
@@ -473,39 +487,67 @@ int electricalParamInit(electrical_parameter * obj)
 /*@brief
  * wsf
  * E.4 油井功能参数控制指令存储地址表
+ * 表9-6 大庆油田统一的 厂家自定义寄存器规划表+
  * 六,厂家自定义
  */
 static int manufacturersParamInit(manufacturers_of_custom * pobj)
 {
 	E1_sys_attribute *psysattr = (E1_sys_attribute *)mb_mapping[0]->tab_registers;
-//	// 49000
+	// 49000
 //	pobj->oilwell_ID[0] = 0x0102;
 //	pobj->oilwell_ID[1] = 0x0304;
-//	// 49020
-//	pobj->communication_protocols = 0x0506;
-//	// 49100
+	// 49020
+	pobj->communication_protocols = CP_MB_TCPIP;			// RTU与上位机协议类型(0：Modbus RTU	1：Modbus TCP/IP	2：DNP3.0	3：大庆 GRM 协议)
+	pobj->data_transfer_mode = 1;											// 数据传输模式(0：透传模式 1：网络识别模式)
+	pobj->heartbeat_sta = 0;													// 0：关闭 1：开启
+	pobj->heartbeat_interval = 60;											// 单位：s（0～65535）
+	pobj->patrol_num = 8;														// RTU巡检总井数 (1～8)
+	pobj->dynagraph_mode = 0x10;										// 功图测试类型 (0：实际功图	0x10：模拟功图)
+	pobj->dynagraph_dot = 200;												// 功图测试点数 (200～250)
+	pobj->elec_switch = 1;														// 电量图测试状态 (0：关闭，1：开启)
+	pobj->offline_savedata_switch = 1;									// 断网存储状态 (0：关闭，1：开启)
+	pobj->A1alram_switch = 0;												// A1报警 (0：关闭，1：开启)
+	pobj->A1alram_upload_cycle = 60;									// A1报警上传周期 (单位 s)
+	pobj->update_packet_size = 32;										// 更新单元单包发送字节数 (必须是 32 的整数倍)
+	pobj->dynagraph_patroltime = 600;									// 功图巡检时间 (单位 s,0:关闭有线巡检)
+	pobj->press_patroltime = 600;											// 压力巡检时间 (同上)
+	pobj->tempreture_patroltime = 600;								// 温度巡检时间 (同上)
+	pobj->elec_patroltime = 600;												// 电参巡检时间 (同上)
+	pobj->angledisplacement_patroltime = 600;					// 角位移巡检时间 (同上)
+	pobj-> load_patroltime = 600;											// 载荷巡检时间 (同上)
+	pobj->touque_patroltime = 600;										// 扭矩巡检时间 (同上)
+	pobj->liquid_patroltime = 600;											// 液面巡检时间 (同上)
+	pobj->rpm_patroltime = 600;											// 扭矩转速巡检时间 (同上)
+	pobj->analog_patroltime = 600;										// 模拟量巡检时间 (同上)
+	pobj->switch_patroltime = 600;											// 开关量巡检时间 (同上)
+	// 49100
 //	pobj->instrument[0].type = 0x01;
 //	pobj->instrument[0].group = 0x02;
 //	pobj->instrument[0].num = 0x03;
 //	pobj->instrument[0].addr = 0x04;
-//
-//	// 49257
-//	pobj->MUX[0] = 0x9876;
-//	// 49308
-//	pobj->update_info[0] = 0x4578;
-//	// 49576 Set an incorrect number of values
-//	pobj->MUX2[0] = 0x5678;
-//	// 49659
-//	pobj->IP_extern.mac[0] = 0x4567;
 
-	memcpy(&pobj->communication_protocols, &psysattr->commparam.communication_protocols, 2);
-	pobj->data_transfer_mode = 1;
-	pobj->heartbeat_sta = 0;
-	pobj->non_heartbeat_interval = 0;
-	pobj->heartbeat_interval = 0;
-	pobj->patrol_num = 8;
-	pobj->dynagraph_mode = 0x10;
-	pobj->dynagraph_dot = 200;
+	// 49257
+	pobj->MUX[0] = 0x9876;
+	// 49308
+	pobj->update_info[0] = 0x4578;
+	// 49576 Set an incorrect number of values
+	pobj->MUX2[0] = 0x5678;
+	// 49659
+//	pobj->IP_extern.mac[0] = 0x4567;
+	pobj->IP_extern.mac[0] = 0xE8;
+	pobj->IP_extern.mac[1] = 0x2A;
+	pobj->IP_extern.mac[2] = 0xEA;
+	pobj->IP_extern.mac[3] = 0x09;
+	pobj->IP_extern.mac[4] = 0x79;
+	pobj->IP_extern.mac[5] = 0xAF;
+//	memcpy(&pobj->communication_protocols, &psysattr->commparam.communication_protocols, 2);
+//	pobj->data_transfer_mode = 1;
+//	pobj->heartbeat_sta = 0;
+//	pobj->non_heartbeat_interval = 0;
+//	pobj->heartbeat_interval = 0;
+//	pobj->patrol_num = 8;
+//	pobj->dynagraph_mode = 0x10;
+//	pobj->dynagraph_dot = 200;
 	// IPv4
 	memcpy(pobj->IP_extern.mac, psysattr->commparam.mac_address, 12);
 	memcpy(&pobj->IP_extern.comm_duplex, &psysattr->commparam.comm_duplex, 2);

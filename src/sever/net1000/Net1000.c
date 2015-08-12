@@ -15,6 +15,7 @@
 //#include "../../def.h"
 //#include "../../modbus/modbus.h"
 //#include "../../modbus/modbus-tcp.h"
+#include "../../modbus/modbus-tcp-private.h"
 #include "../../modbus/modbus-private.h"
 #include "../../database/database.h"
 #include "../../A11_sysAttr/a11sysattr.h"
@@ -36,6 +37,8 @@ int comm_mode;					//
 //};
 
 static int net1000ThreadFunc(void *arg);
+static int modbus_tcp_client_socket(modbus_t *ctx);
+static int modbus_tcp_connect(modbus_t *ctx);
 
 
 static int net1000ThreadFunc(void *arg)
@@ -304,7 +307,64 @@ void net1000Free()
 	if(ctx_net1000 != NULL)
 		modbus_free(ctx_net1000);
 }
-//int modbus_receive_write(uint8_t *req , int head_length)
-//{
-//
-//}
+/* @brief
+ * wsf
+ * 作为Client的TCP方式
+ * connect
+ */
+int modbus_tcp_connect(modbus_t *ctx)
+{
+	struct sockaddr_in server;
+	modbus_tcp_t *ctx_tcp = ctx->backend_data;
+	int res;
+
+	bzero(&server, sizeof(server));
+	server.sin_family = AF_INET;
+	server.sin_port = htons(ctx_tcp->port);
+//	server.sin_port = htons(1502);
+	if (inet_pton(AF_INET, ctx_tcp->ip, &server.sin_addr) <= 0) {
+//		  printf("[错误]Net1000调用inet_pton() 错误\n");
+		  zlog_error(c, "Net1000调用inet_pton() 错误");
+		  return -1;
+		}
+	res = connect(ctx->s,(struct sockaddr *)&server,sizeof(server));
+    if(res ==- 1){
+//    	printf("[错误]Net1000无法连接主站%s，服务端口: %d\n",ctx_tcp->ip, ctx_tcp->port);
+    	zlog_error(c, "Net1000无法连接主站%s，服务端口: %d\n",ctx_tcp->ip, ctx_tcp->port);
+//    	printf("[错误]connect()error\n");
+    	return -1;
+    }
+    return res;
+}
+
+/* @brief
+ * wsf
+ * 作为Client的TCP方式
+ * socket
+ */
+int modbus_tcp_client_socket(modbus_t *ctx)
+{
+//	int sockfd;
+//	struct sockaddr_in server;
+//	modbus_tcp_t *ctx_tcp = ctx->backend_data;
+
+	ctx->s = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+//	ctx->s = sockfd;
+	if(ctx->s == -1){
+		zlog_error(c, "Net1000执行socket 错误");
+		return -1;
+	}
+//	bzero(&server, sizeof(server));
+//	server.sin_family = AF_INET;
+//	server.sin_port = htons(1502);
+//	if (inet_pton(AF_INET, "192.168.93.1", &server.sin_addr) <= 0) {
+//		  printf("[错误]inet_pton() error\n");
+//		  return -1;
+//		}
+//    if(connect(sockfd,(struct sockaddr *)&server,sizeof(server))==-1){
+//    	printf("[错误]connect()error\n");
+//    	return -1;
+//    }
+//    ctx->s =
+	return ctx->s;
+}

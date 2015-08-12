@@ -32,7 +32,7 @@ int use_backend_gprs;
 unsigned short int *tab_rp_registers;
 int nb_points;
 pthread_t gprs_thread;
-extern oil_well *poilwell[17];
+//extern oil_well *poilwell[17];
 
 unsigned char gprs_rsp_data[260];
 unsigned char gprs_req_data[260];

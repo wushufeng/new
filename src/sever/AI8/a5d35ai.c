@@ -54,8 +54,9 @@ int AIDIThreadCancel(void)
 {
 	int res;
 	void * thread_result;
+	int kill_rc = 0;
 
-	int kill_rc = pthread_kill(aidi_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
+	kill_rc = pthread_kill(aidi_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
 	zlog_info(c, "正在取消AIDI线程...");
 	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
 		zlog_warn(c, "AIDI线程不存在或者已经退出");

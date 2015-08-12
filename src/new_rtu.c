@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 //	getAppPath((char*)AppPath);
 //	getAppName((char*)AppFileName);
 	if(mbMappingNew() == 0)
-		zlog_info(c, "MBMapping数据空间准备就绪!");
+		zlog_info(c, "MBMapping数据空间准备就绪");
 	else
 		zlog_error(c, "MBMapping数据空间错误!");
 

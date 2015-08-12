@@ -41,8 +41,6 @@ MODBUS_BEGIN_DECLS
 #define MODBUS_TCP_MAX_ADU_LENGTH  260
 
 modbus_t* modbus_new_tcp(const char *ip_address, int port);
-int modbus_tcp_client_socket(modbus_t *ctx);
-int modbus_tcp_connect(modbus_t *ctx);
 int modbus_tcp_listen(modbus_t *ctx, int nb_connection);
 int modbus_tcp_accept(modbus_t *ctx, int *socket);
 

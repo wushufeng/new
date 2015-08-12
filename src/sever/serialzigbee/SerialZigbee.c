@@ -268,8 +268,8 @@ int serialZigbeeInit(void *obj)
 		fprintf(stderr, "Unable to allocate libmodbus context\n");
 		return -1;
 	}
-	modbus_set_debug(ctx_zigbee, TRUE);
-//	modbus_set_debug(ctx_zigbee, FALSE);
+//	modbus_set_debug(ctx_zigbee, TRUE);
+	modbus_set_debug(ctx_zigbee, FALSE);
 	modbus_set_error_recovery(ctx_zigbee,
 	                              MODBUS_ERROR_RECOVERY_LINK |
 	                              MODBUS_ERROR_RECOVERY_PROTOCOL);
@@ -709,6 +709,7 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 						static time_t last_time[17] = {0};
 
 						poilwell[instrument_group]->load_displacement.dynagraph.interval = 5;				//设置功图自动测量间隔为5分钟
+
 						A11_req_revdata_dynagraph * dynagraph;
 						dynagraph = (A11_req_revdata_dynagraph *)req;
 
@@ -729,8 +730,8 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order = 0;
 									last_time[instrument_group] = now_time;
 									// 发送功图采集命令
-									usleep(100000);
-									zlog_info(c, "开始发送功图[组=%d]采集命令!\n", instrument_group);
+									usleep(100000);				// 发送采集命令前得延时
+									zlog_info(c, "发送功图[组=%d]采集命令!\n", instrument_group);
 									rsp_length = collectDynagraphRespone(&data_ex[instrument_group]);
 
 									// 判断对应组号得电参是否在线，是则，发送电参采集命令
@@ -742,7 +743,7 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 											zlog_info(c, "提示]发送一体化功图采[组=%d]集命令失败!\n", instrument_group);
 											break;
 										}
-										zlog_info(c, "开始发送电参[组=%d]采集命令!\n", instrument_group);
+										zlog_info(c, "发送电参[组=%d]采集命令!\n", instrument_group);
 										rsp_length = collectElecRespone(&data_ex[instrument_group]);
 									}
 								}
@@ -788,7 +789,6 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 									tempdata = (htons(dynagraph_data->stroke) / 1000.0);
 									memcpy(&pexbuffer[instrument_group]->loaddata.pumping_stroke, &tempdata,4);
 //									zlog_info(c, "冲程 = %d   冲程 =  %f \n", htons(dynagraph_data->stroke), tempdata);
-
 									zlog_info(c, "接收到一体化功图[组=%d]数据第 [%d] 包!  \n", instrument_group, dynagraph_data->data_serialnum[0]);
 								}
 								else
@@ -819,7 +819,7 @@ static int zigbee_reply(modbus_t *ctx,  uint8_t *req, int req_length)//, modbus_
 										pexbuffer[instrument_group]->dg_OK = 0x3C;
 									}
 								}
-								rsp_length = dataGroupRespone(0x0201);			// 一体化功图
+								rsp_length = dataGroupRespone(0x0201);			// 准备一体化功图数据包应答数据
 								if((pexbuffer[instrument_group]->dg_OK == 0x3C) && (pexbuffer[instrument_group]->elec_online == 0x3C))
 								{
 
@@ -1206,7 +1206,7 @@ static int collectDynagraphRespone(data_exchange *datex)
 	collect->ZB11_framehead.frame_ID = 0x00;																	// 00无ACK  01有ACK
 	memcpy(collect->ZB11_framehead.mac_addr, ZB_91->ZB91_framehead.mac_addr, 18);
 	collect->ZB11_framehead.radius = 0x00;
-	collect->ZB11_framehead.send_opt = 0x60;
+	collect->ZB11_framehead.send_opt = 0x00;	// 0x60;
 
 	memcpy(&collect->A11_framehead, &ZB_91->A11_framehead, sizeof(A11_data_framehead));
 	collect->A11_framehead.instrument_type =  htons(0x1F10);						// 根据A11规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10
@@ -1242,7 +1242,7 @@ static int collectElecRespone(data_exchange *datex)
 	collect->ZB11_framehead.frame_ID = 0x00;																	// 00无ACK  01有ACK
 	memcpy(collect->ZB11_framehead.mac_addr, datex->ZB91_framehead.mac_addr, 18);
 	collect->ZB11_framehead.radius = 0x00;
-	collect->ZB11_framehead.send_opt = 0x60;
+	collect->ZB11_framehead.send_opt = 0x00;	// 0x60;
 
 	memcpy(&collect->A11_framehead, &datex->A11_framehead, sizeof(A11_data_framehead));
 	collect->A11_framehead.instrument_type = htons(0x1F10);						// 根据A11规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10
@@ -1284,7 +1284,7 @@ inline int dataGroupRespone(unsigned short int data_type)
 	rsp_dynagraph->ZB11_framehead.frame_ID = 0x00;																	// 00无ACK  01有ACK
 	memcpy(rsp_dynagraph->ZB11_framehead.mac_addr, ZB_91->ZB91_framehead.mac_addr, 18);
 	rsp_dynagraph->ZB11_framehead.radius = 0x00;
-	rsp_dynagraph->ZB11_framehead.send_opt = 0x60;
+	rsp_dynagraph->ZB11_framehead.send_opt = 0x00;	// 0x60;
 
 	memcpy(&rsp_dynagraph->A11_framehead, &ZB_91->A11_framehead, sizeof(A11_data_framehead));
 	rsp_dynagraph->A11_framehead.instrument_type =  htons(0x1F10);						// 根据A11规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10
@@ -1349,7 +1349,7 @@ static int readElecRespone(data_exchange *datex)
 	readcurrent->ZB11_framehead.frame_ID = 0x00;																	// 00无ACK  01有ACK
 	memcpy(readcurrent->ZB11_framehead.mac_addr, datex->ZB91_framehead.mac_addr, 18);
 	readcurrent->ZB11_framehead.radius = 0x00;
-	readcurrent->ZB11_framehead.send_opt = 0x60;
+	readcurrent->ZB11_framehead.send_opt = 0x00;	// 0x60;
 
 	memcpy(&readcurrent->A11_framehead, &datex->A11_framehead, sizeof(A11_data_framehead));
 	readcurrent->A11_framehead.instrument_type =  htons(0x1F10);						// 根据A11规范，RTU 应答传感器的帧头中的仪表类型应为 0x1F10

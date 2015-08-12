@@ -328,19 +328,19 @@ typedef struct
  */
 typedef struct
 {
-	unsigned short int interval;										// 功图自动测量间隔
-	unsigned short int manul_collection_order;				// 手工采集功图指令
-	unsigned short int set_dot;											// 功图采集设置点数
-	unsigned short int actual_dot;									// 功图实际点数
-	unsigned short int collection_datetime[6];				// 功图采集时间
+	unsigned short int interval;								// 功图自动测量间隔
+	unsigned short int manul_collection_order;					// 手工采集功图指令
+	unsigned short int set_dot;									// 功图采集设置点数
+	unsigned short int actual_dot;								// 功图实际点数
+	unsigned short int collection_datetime[6];					// 功图采集时间
 	unsigned short int pumping_speed[2];						// 冲次
 	unsigned short int pumping_stroke[2];						// 冲程
 	unsigned short int reserved_address1[6];					// 预留地址
 	unsigned short int displacement[250];						// 当前示功图数据-位移值250点
-	unsigned short int load[250];										// 位移点对应载荷值 250 点
-	unsigned short int current[250];								// 位移点对应电流值 250 点
-	unsigned short int power[250];									// 位移点对应有功功率值 250点
-//	unsigned short int reserved_address2[1000];			// 预留地址
+	unsigned short int load[250];								// 位移点对应载荷值 250 点
+	unsigned short int current[250];							// 位移点对应电流值 250 点
+	unsigned short int power[250];								// 位移点对应有功功率值 250点
+//	unsigned short int reserved_address2[1000];					// 预留地址
 }__attribute__((packed)) load_displacement;
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // 表 E.4 油井功能参数控制指令存储地址表
@@ -565,7 +565,7 @@ typedef struct
 {
 //	unsigned short int custom[1000];									// 厂家自定义区1000个地址
 	// 2.2.3 大庆油田统一的厂家自定义寄存器规划表检查
-	unsigned short int oilwell_ID[16];								// 8 口油井得油井ID
+	unsigned short int oilwell_ID[16];								// 16 口油井得油井ID
 	unsigned short int RTU_ID[2];									// RTU_ID
 	unsigned char reserved1[4];										// 预留
 	unsigned short int communication_protocols;			// RTU与上位机协议类型(0：Modbus RTU	1：Modbus TCP/IP	2：DNP3.0	3：大庆 GRM 协议)
@@ -585,7 +585,7 @@ typedef struct
 	unsigned short int dynagraph_patroltime;				// 功图巡检时间 (单位 s,0:关闭有线巡检)
 	unsigned short int press_patroltime;							// 压力巡检时间 (同上)
 	unsigned short int tempreture_patroltime;				// 温度巡检时间 (同上)
-	unsigned short int elec__patroltime;							// 电参巡检时间 (同上)
+	unsigned short int elec_patroltime;							// 电参巡检时间 (同上)
 	unsigned short int angledisplacement_patroltime;	// 角位移巡检时间 (同上)
 	unsigned short int load_patroltime;							// 载荷巡检时间 (同上)
 	unsigned short int touque_patroltime;						// 扭矩巡检时间 (同上)
@@ -595,8 +595,8 @@ typedef struct
 	unsigned short int switch_patroltime;						// 开关量巡检时间 (同上)
 	unsigned char reserved3[108];									// 预留
 	instrument_parameter instrument[63];						// 仪表1参数：类型、组号、编号、地址 (地址：用于有线仪表 地址为 0：无线仪表 地址非 0：有线仪表)
-	unsigned char effective_instrument_num;					 // 有效仪表数量
-	unsigned char total_instrument;									 // 全部仪表数量
+	unsigned char effective_instrument_num;					// 有效仪表数量
+	unsigned char total_instrument;									// 全部仪表数量
 	unsigned char reserved4[2];										// 保留
 	unsigned char reserved5[58];										// 保留
 	unsigned short int MUX[51];										// 复用寄存器49257~49307
@@ -607,11 +607,13 @@ typedef struct
 }__attribute__((packed)) manufacturers_of_custom;
 
 // E1 远程终端单元系统属性数据存储地址
+// 该表中汇集了需要存储到配置文件上得一些数据格式
 typedef struct
 {
 	RTU_baseinfo baseinfo;
 	communicatios_parameters commparam;
 	AI_DI_parameter aidi_param;
+//	load_displacement dynagraph;
 }E1_sys_attribute;
 /*
  * 当前使用方式为只使用一个RTU，所以将E2表中得关于AIDI的参数转移至地址中
