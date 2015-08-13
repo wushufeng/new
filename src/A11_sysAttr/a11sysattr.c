@@ -28,6 +28,7 @@ static int commParamInit(communicatios_parameters * p_commparam);
 int createA11Configfile(E1_sys_attribute * psysattr,const char *filename);
 int getA11Configure(E1_sys_attribute *psysattr);
 static int manufacturersParamInit(manufacturers_of_custom * pobj);
+static int manufacturersParamToFile(manufacturers_of_custom * pobj);
 oil_well *poilwell[17];
 
 E1_sys_attribute* LoadConfigA11(void)
@@ -42,7 +43,7 @@ E1_sys_attribute* LoadConfigA11(void)
 		if(createA11Configfile(psysattr,A11filename) == 0)
         	zlog_info(c, "创建A11配置成功，并读入默认配置");
         else
-        	zlog_error(c, "创建A11配置失败，从程序读入默认配置");
+        	zlog_warn(c, "创建A11配置失败，从程序读入默认配置");
     }
 	else
 	{
@@ -58,39 +59,40 @@ E1_sys_attribute* LoadConfigA11(void)
 				break;
 			case WST_VALVE_VAULT:											// 阀室
 				break;
-			case WST_OIL_WELL:													// 油井（生产井）
+			case WST_OIL_WELL:												// 油井（生产井）
 				zlog_info(c, "当前配置为得应用井站类型为\"油井\"(001)");
 				zlog_info(c, "初始化数据格式为油井格式");
 				for(n = 0; n < 17; n ++)
 					poilwell[n] = (oil_well *)(mb_mapping[n]->tab_registers + sizeof(E1_sys_attribute) / 2);
 
 				manufacturersParamInit(&poilwell[0]->fuction_param.custom);
+				manufacturersParamToFile(&poilwell[0]->fuction_param.custom);
 //				poilwell[0]->fuction_param.custom.oilwell_ID[0] = 0x01;
 //				poilwell[0]->fuction_param.custom.oilwell_ID[1] = 0x02;
 				break;
 			case WST_GASS_WELL:												// 气井
 				break;
-			case WST_WATER_SOURCE_WELL:							// 水源井
+			case WST_WATER_SOURCE_WELL:										// 水源井
 				break;
 			case WST_INJECTION_WELL:										// 注水井
 				break;
-			case WST_GAS_INJECTION_WELL:								// 注气井
+			case WST_GAS_INJECTION_WELL:									// 注气井
 				break;
-			case WST_OBSERVING_WELL:									// 观察井
+			case WST_OBSERVING_WELL:										// 观察井
 				break;
-			case WST_METERING_STATION:								// 计量站
+			case WST_METERING_STATION:										// 计量站
 				break;
-			case WST_BOOSTER_STATION:									// 增压站
+			case WST_BOOSTER_STATION:										// 增压站
 				break;
-			case WST_GAS_GATHERING_STATION:						// 集气站
+			case WST_GAS_GATHERING_STATION:									// 集气站
 				break;
-			case WST_GAS_TRANSMISSION_STATION:				//输气站
+			case WST_GAS_TRANSMISSION_STATION:								//输气站
 				break;
-			case WST_DISTRIBUTION_STATION:						// 配气站
+			case WST_DISTRIBUTION_STATION:									// 配气站
 				break;
-			case WST_RE_INJECTION_STATION:							// 水处理（回注）站配气站
+			case WST_RE_INJECTION_STATION:									// 水处理（回注）站配气站
 				break;
-			case WST_DEHYDRATION_STATION:						// 脱水站
+			case WST_DEHYDRATION_STATION:									// 脱水站
 				break;
 			default:
 				break;
@@ -197,8 +199,9 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 	basesInfoInit(&psysattr->baseinfo);
 	// 用默认值初始化commparam
 	commParamInit(&psysattr->commparam);
-//	// 用默认值初始化load_displacement
-//	laodDisplacementInit(&psysattr->dynagraph);
+	// 用默认值初始化厂家自定义区
+//	manufacturersParamInit(&poilwell[0]->fuction_param.custom);
+
 	// 将内从中的baseinfo参数写入配置文件
 	sprintf(str,"%d",psysattr->baseinfo.password);
 	if (!write_profile_string("rtuBaseInfo","password",str,A11filename)) return -1;
@@ -277,11 +280,8 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 	if (!write_profile_string("commParam", "communication_protocols",str,A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.communication_mode);
 	if (!write_profile_string("commParam", "communication_mode",str,A11filename)) return -1;
-	// 将内存中的laod_displacement参数写入配置文件
-//	sprintf(str, "%d", psysattr->dynagraph.set_dot);
-//	if (!write_profile_string("laod_displacement","set_dot",str,A11filename)) return -1;
-//	sprintf(str, "%d",psysattr->dynagraph.interval);
-//	if (!write_profile_string("laod_displacement","interval",str,A11filename)) return -1;
+	// 将内存中的厂商自定义数据参数写入配置文件
+//	manufacturersParamToFile(&poilwell[0]->fuction_param.custom);
 	return 0;
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -497,29 +497,30 @@ static int manufacturersParamInit(manufacturers_of_custom * pobj)
 //	pobj->oilwell_ID[0] = 0x0102;
 //	pobj->oilwell_ID[1] = 0x0304;
 	// 49020
-	pobj->communication_protocols = CP_MB_TCPIP;			// RTU与上位机协议类型(0：Modbus RTU	1：Modbus TCP/IP	2：DNP3.0	3：大庆 GRM 协议)
-	pobj->data_transfer_mode = 1;											// 数据传输模式(0：透传模式 1：网络识别模式)
-	pobj->heartbeat_sta = 0;													// 0：关闭 1：开启
-	pobj->heartbeat_interval = 60;											// 单位：s（0～65535）
-	pobj->patrol_num = 8;														// RTU巡检总井数 (1～8)
-	pobj->dynagraph_mode = 0x10;										// 功图测试类型 (0：实际功图	0x10：模拟功图)
-	pobj->dynagraph_dot = 200;												// 功图测试点数 (200～250)
-	pobj->elec_switch = 1;														// 电量图测试状态 (0：关闭，1：开启)
-	pobj->offline_savedata_switch = 1;									// 断网存储状态 (0：关闭，1：开启)
-	pobj->A1alram_switch = 0;												// A1报警 (0：关闭，1：开启)
-	pobj->A1alram_upload_cycle = 60;									// A1报警上传周期 (单位 s)
-	pobj->update_packet_size = 32;										// 更新单元单包发送字节数 (必须是 32 的整数倍)
-	pobj->dynagraph_patroltime = 600;									// 功图巡检时间 (单位 s,0:关闭有线巡检)
-	pobj->press_patroltime = 600;											// 压力巡检时间 (同上)
-	pobj->tempreture_patroltime = 600;								// 温度巡检时间 (同上)
-	pobj->elec_patroltime = 600;												// 电参巡检时间 (同上)
-	pobj->angledisplacement_patroltime = 600;					// 角位移巡检时间 (同上)
-	pobj-> load_patroltime = 600;											// 载荷巡检时间 (同上)
-	pobj->touque_patroltime = 600;										// 扭矩巡检时间 (同上)
-	pobj->liquid_patroltime = 600;											// 液面巡检时间 (同上)
-	pobj->rpm_patroltime = 600;											// 扭矩转速巡检时间 (同上)
-	pobj->analog_patroltime = 600;										// 模拟量巡检时间 (同上)
-	pobj->switch_patroltime = 600;											// 开关量巡检时间 (同上)
+	pobj->communication_protocols = CP_MB_TCPIP;		// RTU与上位机协议类型(0：Modbus RTU	1：Modbus TCP/IP	2：DNP3.0	3：大庆 GRM 协议)
+	pobj->data_transfer_mode = 1;						// 数据传输模式(0：透传模式 1：网络识别模式)
+	pobj->heartbeat_sta = 0;							// 0：关闭 1：开启
+	pobj->non_heartbeat_interval= 60;					// 无应答心跳间隔时间 (单位：s（0～65535）)
+	pobj->heartbeat_interval= 60;						// 有应答心跳间隔时间 (单位：s（0～65535）)
+	pobj->patrol_num = 8;								// RTU巡检总井数 (1～8)
+	pobj->dynagraph_mode = 0x10;						// 功图测试类型 (0：实际功图	0x10：模拟功图)
+	pobj->dynagraph_dot = 200;							// 功图测试点数 (200～250)
+	pobj->elec_switch = 1;									// 电量图测试状态 (0：关闭，1：开启)
+	pobj->offline_savedata_switch = 1;					// 断网存储状态 (0：关闭，1：开启)
+	pobj->A1alram_switch = 0;							// A1报警 (0：关闭，1：开启)
+	pobj->A1alram_upload_cycle = 60;					// A1报警上传周期 (单位 s)
+	pobj->update_packet_size = 32;						// 更新单元单包发送字节数 (必须是 32 的整数倍)
+	pobj->dynagraph_patroltime = 600;					// 功图巡检时间 (单位 s,0:关闭有线巡检)
+	pobj->press_patroltime = 600;						// 压力巡检时间 (同上)
+	pobj->tempreture_patroltime = 600;					// 温度巡检时间 (同上)
+	pobj->elec_patroltime = 600;						// 电参巡检时间 (同上)
+	pobj->angledisplacement_patroltime = 600;			// 角位移巡检时间 (同上)
+	pobj-> load_patroltime = 600;						// 载荷巡检时间 (同上)
+	pobj->touque_patroltime = 600;						// 扭矩巡检时间 (同上)
+	pobj->liquid_patroltime = 600;						// 液面巡检时间 (同上)
+	pobj->rpm_patroltime = 600;							// 扭矩转速巡检时间 (同上)
+	pobj->analog_patroltime = 600;						// 模拟量巡检时间 (同上)
+	pobj->switch_patroltime = 600;						// 开关量巡检时间 (同上)
 	// 49100
 //	pobj->instrument[0].type = 0x01;
 //	pobj->instrument[0].group = 0x02;
@@ -591,6 +592,76 @@ static int manufacturersParamInit(manufacturers_of_custom * pobj)
 	pobj->IP_extern.IPv6_obtain_ip[6] = 0;
 	pobj->IP_extern.IPv6_obtain_ip[7] = 0;
 //	get_float
+	return 0;
+}
+static int manufacturersParamToFile(manufacturers_of_custom * pobj)
+{
+	char str[32];
+
+	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_ip[0],	\
+			pobj->IP_extern.IPv4_ip[1],	\
+			pobj->IP_extern.IPv4_ip[2],	\
+			pobj->IP_extern.IPv4_ip[3]);
+
+	sprintf(str,"%d",pobj->IP_extern.comm_duplex);
+	if (!write_profile_string("manufacturers_of_custom","comm_duplex",str,A11filename)) return -1;
+
+	sprintf(str,"%02X:%02X:%02X:%02X:%02X:%02X",pobj->IP_extern.mac[0], \
+			pobj->IP_extern.mac[1],	\
+			pobj->IP_extern.mac[2],	\
+			pobj->IP_extern.mac[3],	\
+			pobj->IP_extern.mac[4],	\
+			pobj->IP_extern.mac[5]);
+		if (!write_profile_string("manufacturers_of_custom","mac_address",str,A11filename)) return -1;;
+
+	sprintf(str,"%d",pobj->switch_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","switch_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->analog_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","analog_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->rpm_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","rpm_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->liquid_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","liquid_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->touque_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","touque_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->load_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","load_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->angledisplacement_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","angledisplacement_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->elec_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","elec_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->tempreture_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","tempreture_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->press_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","press_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->dynagraph_patroltime);
+	if (!write_profile_string("manufacturers_of_custom","dynagraph_patroltime",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->update_packet_size);
+	if (!write_profile_string("manufacturers_of_custom","update_packet_size",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->A1alram_upload_cycle);
+	if (!write_profile_string("manufacturers_of_custom","A1alram_upload_cycle",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->A1alram_switch);
+	if (!write_profile_string("manufacturers_of_custom","A1alram_switch",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->offline_savedata_switch);
+	if (!write_profile_string("manufacturers_of_custom","offline_savedata_switch",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->elec_switch);
+	if (!write_profile_string("manufacturers_of_custom","elec_sta",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->dynagraph_dot);
+	if (!write_profile_string("manufacturers_of_custom","dynagraph_dot",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->dynagraph_mode);
+	if (!write_profile_string("manufacturers_of_custom","dynagraph_mode",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->patrol_num);
+	if (!write_profile_string("manufacturers_of_custom","patrol_num",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->heartbeat_interval);
+	if (!write_profile_string("manufacturers_of_custom","heartbeat_interval",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->non_heartbeat_interval);
+	if (!write_profile_string("manufacturers_of_custom","non_heartbeat_interval",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->heartbeat_sta);
+	if (!write_profile_string("manufacturers_of_custom","heartbeat_sta",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->data_transfer_mode);
+	if (!write_profile_string("manufacturers_of_custom","data_transfer_mode",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->communication_protocols);
+	if (!write_profile_string("manufacturers_of_custom","communication_protocols",str,A11filename)) return -1;
 	return 0;
 }
 //RTU_baseinfo* baseinfoInit(void)
