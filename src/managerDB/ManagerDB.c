@@ -52,6 +52,7 @@ const short int constload[200] = {
 short int readd[200];
 const char *SQLCode = "create table if not exists 'carddata' ( \
 			'ID'  INTEGER PRIMARY KEY AUTOINCREMENT, \
+			'Upload'	TEXT,	\
 			'Wellname'  TEXT, \
 			'Interval'  INTEGER, \
 			'Manual' INTEGER ,\
@@ -173,9 +174,9 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 	// 插入基本数据insert into
 	buffer = (char *)malloc(2048);
 	bzero(buffer, 2048);
-	snprintf(buffer, 2048, "insert into carddata (Wellname, Interval, Manual, SetDot, ActualDot, CollectDateTime,Speed, Stroke) \
-			values (%d, %d, %d, %d, %d, \'%s\', %d, %d);", \
-			group, pobj->interval, pobj->manul_collection_order, pobj->set_dot, pobj->actual_dot, timebuffer, speed, stroke);
+	snprintf(buffer, 2048, "insert into carddata (Wellname, Upload, Interval, Manual, SetDot, ActualDot, CollectDateTime,Speed, Stroke) \
+			values (%d, \'%s\', %d, %d, %d, %d, \'%s\', %d, %d);", \
+			group, "NO", pobj->interval, pobj->manul_collection_order, pobj->set_dot, pobj->actual_dot, timebuffer, speed, stroke);
 	res = sqlite3_exec(pdb, buffer, 0, 0, &errmsg);
 	if(res){
 //		char * tempinfo = NULL;

@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 	if(mbMappingNew() == 0)
 		zlog_info(c, "MBMapping数据空间准备就绪");
 	else
-		zlog_error(c, "MBMapping数据空间错误!");
+		zlog_error(c, "MBMapping数据空间错误");
 
 	// 加载A11数据,该指针指向mb保持寄存器
 	psysattr = LoadConfigA11();
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 	res = createDatabaseThread();
 	if(res != 0)
 	{
-		zlog_error(c, "启动数据同步失败!");
+		zlog_error(c, "启动数据同步失败");
 		exit(EXIT_FAILURE);
 	}
 //	printf("[提示]创建sqlite库!\n");
@@ -101,11 +101,11 @@ int main(int argc, char *argv[])
 	 */
 //	if(0)
 	{
-		zlog_info(c, "启动AIDI线程!");
+		zlog_info(c, "启动AIDI线程");
 		res = createAidiThread();
 		if(res != 0)
 		{
-			zlog_error(c, "AIDI线程创建失败!");
+			zlog_error(c, "AIDI线程创建失败");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -121,12 +121,12 @@ int main(int argc, char *argv[])
 		res = net1000Init((void *) psysattr);
 		if(res == 0)
 		{
-			zlog_info(c, "Net1000初始化完成!");
-			zlog_info(c, "启动Net1000线程!");
+			zlog_info(c, "Net1000初始化完成");
+			zlog_info(c, "启动Net1000线程");
 			res = createNet1000Thread();
 		    if(res != 0)
 		    {
-		    	zlog_error(c, "Net1000线程创建失败!");
+		    	zlog_error(c, "Net1000线程创建失败");
 		        exit(EXIT_FAILURE);
 		    }
 		}
@@ -143,12 +143,12 @@ int main(int argc, char *argv[])
 		res = serial232Init((void *)psysattr);
 		if(res == 0)
 		{
-			zlog_info(c, "Serial232初始化完成!");
-			zlog_info(c, "启动Serial232线程!\n");
+			zlog_info(c, "Serial232初始化完成");
+			zlog_info(c, "启动Serial232线程!");
 			res = createSerial232Thread();
 			if(res != 0)
 			{
-				zlog_error(c, "Serial232线程创建失败!");
+				zlog_error(c, "Serial232线程创建失败");
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -164,12 +164,12 @@ int main(int argc, char *argv[])
 		res = serialZigbeeInit((void *) psysattr);
 		if(res == 0)
 		{
-			zlog_info(c, "ZigBee初始化完成!");
-			zlog_info(c, "启动ZigBee线程!");
+			zlog_info(c, "ZigBee初始化完成");
+			zlog_info(c, "启动ZigBee线程");
 			res = createZigbeeThread();
 		    if(res != 0)
 		    {
-		    	zlog_error(c, "ZigBee线程创建失败!");
+		    	zlog_error(c, "ZigBee线程创建失败");
 		        exit(EXIT_FAILURE);
 		    }
 		}

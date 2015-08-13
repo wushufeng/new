@@ -109,16 +109,16 @@ typedef struct
 typedef struct
 {
 	unsigned char dynagraph_mode;									// 功图模式（与功图数据）
-	unsigned char algorithms;												// 算法（与功图数据）这个不知道怎么得到的
+	unsigned char algorithms;										// 算法（与功图数据）这个不知道怎么得到的
 	unsigned short int synchronization_time;						// 同步时间 10ms
-	unsigned short int time_mark;										// 时间标记（ms下死点时间点由功图参数得到）
-	unsigned short int cycle;												// 周期（无符号整数，10ms，由功图参数得到）
-	unsigned short int dot;													// 点数（无符号整数型，由功图参数得到）
-	unsigned short int time_interval;									// 时间间隔
-	unsigned char elec_flag;													// 是否有该电参
-	unsigned char elecOK;													// 电参全部采集完毕
-	unsigned char dgOK;														// 功图全部采集完毕
-	ZB91_revdata_framehead ZB91_framehead;					// ZigBee帧头
+	unsigned short int time_mark;									// 时间标记（ms下死点时间点由功图参数得到）
+	unsigned short int cycle;										// 周期（无符号整数，10ms，由功图参数得到）
+	unsigned short int dot;											// 点数（无符号整数型，由功图参数得到）
+	unsigned short int time_interval;								// 时间间隔
+	unsigned char elec_flag;										// 是否有该电参
+	unsigned char elecOK;											// 电参全部采集完毕
+	unsigned char dgOK;												// 功图全部采集完毕
+	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11帧头
 }__attribute__((packed)) data_exchange	;
 
@@ -147,7 +147,7 @@ typedef struct
 {
 	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;
-	conventional_data_frame_format RF_Data;								// 接收到得数据 数据长度为（length - 18）
+	conventional_data_frame_format RF_Data;							// 接收到得数据 数据长度为（length - 18）
 } __attribute__((packed)) ZB_explicit_RX_indicator;
 
 
@@ -162,7 +162,7 @@ typedef struct
 {
 	ZB11_snddata_framehead ZB11_framehead;							// ZB_11帧头
 	A11_data_framehead A11_framehead;												//
-	unsigned short int sleep_time;												//
+	unsigned short int sleep_time;									//
 	unsigned char check_sum;
 } __attribute__((packed)) ZB_explicit_cmd_frame;
 
@@ -173,10 +173,10 @@ typedef struct
  */
 typedef struct
 {
-	unsigned char comm_efficiency;											// 通讯效率
-	unsigned char bat_vol;															// 电池电压
-	unsigned short int sleep_time;												// 休眠时间
-	unsigned short int instument_sta;											// 仪器状态
+	unsigned char comm_efficiency;									// 通讯效率
+	unsigned char bat_vol;											// 电池电压
+	unsigned short int sleep_time;									// 休眠时间
+	unsigned short int instument_sta;								// 仪器状态
 }__attribute__((packed)) A11_revdata_frame;
 
 /* @brief
@@ -187,10 +187,10 @@ typedef struct
 typedef struct
 {
 	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
-	A11_data_framehead A11_framehead;										// A11数据帧头 10B
-	A11_revdata_frame A11_frame_data;										// A11数据 6B
-	unsigned short int realtime_data[2];										// 存放实时数据
-	unsigned short int instument_temp[2];									// 存放仪表温度
+	A11_data_framehead A11_framehead;								// A11数据帧头 10B
+	A11_revdata_frame A11_frame_data;								// A11数据 6B
+	unsigned short int realtime_data[2];							// 存放实时数据
+	unsigned short int instument_temp[2];							// 存放仪表温度
 		}__attribute__((packed)) A11_revdata_press_tempreture;
 /* @brief
  * wsf
@@ -200,18 +200,18 @@ typedef struct
 typedef struct
 {
 	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
-	A11_data_framehead A11_framehead;										// A11数据帧头 10B
-	A11_revdata_frame A11_frame_data;										// A11数据 6B
-	unsigned short int current_phase_a[2];									// 电机工作电流 A 相 A
-	unsigned short int current_phase_b[2];									// 电机工作电流 B 相 A
-	unsigned short int current_phase_c[2];									// 电机工作电流 C 相 A
-	unsigned short int voltage_phase_a[2];									// 电机工作电压 A 相 V
-	unsigned short int voltage_phase_b[2];									// 电机工作电压 B 相 V
-	unsigned short int voltage_phase_c[2];									// 电机工作电压 C 相 V
-	unsigned short int power_factor[2];										// 电机功率因数
-	unsigned short int moto_p[2];												// 电机有功功率 KW
-	unsigned short int moto_q[2];												// 电机无功功率 KW
-	unsigned short int total_power[2];											// 电机总耗电 KW`H
+	A11_data_framehead A11_framehead;								// A11数据帧头 10B
+	A11_revdata_frame A11_frame_data;								// A11数据 6B
+	unsigned short int current_phase_a[2];							// 电机工作电流 A 相 A
+	unsigned short int current_phase_b[2];							// 电机工作电流 B 相 A
+	unsigned short int current_phase_c[2];							// 电机工作电流 C 相 A
+	unsigned short int voltage_phase_a[2];							// 电机工作电压 A 相 V
+	unsigned short int voltage_phase_b[2];							// 电机工作电压 B 相 V
+	unsigned short int voltage_phase_c[2];							// 电机工作电压 C 相 V
+	unsigned short int power_factor[2];								// 电机功率因数
+	unsigned short int moto_p[2];									// 电机有功功率 KW
+	unsigned short int moto_q[2];									// 电机无功功率 KW
+	unsigned short int total_power[2];								// 电机总耗电 KW`H
 }__attribute__((packed)) A11_revdata_electrical_parameter;
 
 /* @brief
@@ -222,10 +222,10 @@ typedef struct
 typedef struct
 {
 	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
-	A11_data_framehead A11_framehead;										// A11数据帧头 10B
-	A11_revdata_frame A11_frame_data;										// A11数据 6B
-	unsigned short int acceleration[2];										// 加速度 单位：g
-	unsigned short int load[2];														// 载荷 单位：KN
+	A11_data_framehead A11_framehead;								// A11数据帧头 10B
+	A11_revdata_frame A11_frame_data;								// A11数据 6B
+	unsigned short int acceleration[2];								// 加速度 单位：g
+	unsigned short int load[2];										// 载荷 单位：KN
 }__attribute__((packed)) A11_req_revdata_dynagraph;
 
 /* @brief
@@ -236,14 +236,14 @@ typedef struct
  */
 typedef struct
 {
-	ZB11_snddata_framehead ZB11_framehead;					// ZigBee帧头
+	ZB11_snddata_framehead ZB11_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char mode;														// 功图模式（实际功图 0x00；功图原始数据 0x01；仿真功图0x10）
-	unsigned short int dot;													// 功图点数（整数型，无符号整数型，采集功图的点数）
+	unsigned char mode;												// 功图模式（实际功图 0x00；功图原始数据 0x01；仿真功图0x10）
+	unsigned short int dot;											// 功图点数（整数型，无符号整数型，采集功图的点数）
 	unsigned short int synchronization_time;						// 同步时间（10ms 发送采集功图命令得时间标签）
-	unsigned short int time_interval;									// 时间间隔（ms 功图点采集间隔）
+	unsigned short int time_interval;								// 时间间隔（ms 功图点采集间隔）
 	unsigned char 	company_func[10];								// 厂家功能
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_rsp_collect_dynagraph;
 
 /* @brief
@@ -254,15 +254,15 @@ typedef struct
  */
 typedef struct
 {
-	ZB11_snddata_framehead ZB11_framehead;					// ZigBee帧头
+	ZB11_snddata_framehead ZB11_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char mode;														// 功图模式（实际功图 0x00；功图原始数据 0x01；仿真功图0x10）
-	unsigned short int dot;													// 功图点数（整数型，无符号整数型，采集功图的点数）
+	unsigned char mode;												// 功图模式（实际功图 0x00；功图原始数据 0x01；仿真功图0x10）
+	unsigned short int dot;											// 功图点数（整数型，无符号整数型，采集功图的点数）
 	unsigned short int synchronization_time;						// 同步时间（10ms 发送采集功图命令得时间标签）
-	unsigned short int time_interval;									// 时间间隔（ms 功图点采集间隔）
-	unsigned char algorithms;												// 算法
+	unsigned short int time_interval;								// 时间间隔（ms 功图点采集间隔）
+	unsigned char algorithms;										// 算法
 	unsigned char company_func[10];									// 厂家功能
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_rsp_collect_elec;
 
 /* @brief
@@ -272,16 +272,16 @@ typedef struct
  */
 typedef struct
 {
-	ZB91_revdata_framehead ZB91_framehead;					// ZigBee帧头
+	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char data_serialnum[4];									// 数据组顺序号
+	unsigned char data_serialnum[4];								// 数据组顺序号
 	unsigned short int synchronization_time;						// 同步时间
-	unsigned short int time_mark;										// 时间标记
-	unsigned short int dot;													// 功图点数（整数型，无符号整数型，采集功图的实际点数）
-	unsigned short int stroke;												// 冲程（无符号证书，隐含三维小数）
-	unsigned short int cycle;												// 周期（无符号整数，10ms）
+	unsigned short int time_mark;									// 时间标记
+	unsigned short int dot;											// 功图点数（整数型，无符号整数型，采集功图的实际点数）
+	unsigned short int stroke;										// 冲程（无符号证书，隐含三维小数）
+	unsigned short int cycle;										// 周期（无符号整数，10ms）
 	unsigned char 	company_func[20];								// 厂家功能
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_req_dynagraph_first;
 
 /* @brief
@@ -291,13 +291,13 @@ typedef struct
  */
 typedef struct
 {
-	ZB91_revdata_framehead ZB91_framehead;					// ZigBee帧头
+	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char data_serialnum;										// 数据组顺序号
-	unsigned char reserved;													// 保留
+	unsigned char data_serialnum;									// 数据组顺序号
+	unsigned char reserved;											// 保留
 	unsigned short int dynagraph[30];								// 功图数据
-//	unsigned char dynagraph[60];											// 功图数据
-	unsigned char check_sum;												// ZigBee校验和
+//	unsigned char dynagraph[60];									// 功图数据
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_req_dynagraph_others;
 /* @brief
  * wsf
@@ -311,10 +311,10 @@ typedef struct
  */
 typedef struct
 {
-	ZB11_snddata_framehead ZB11_framehead;					// ZigBee帧头
+	ZB11_snddata_framehead ZB11_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char data_serialnum;										// 数据组顺序号
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char data_serialnum;									// 数据组顺序号
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_rsp_datagroup;
 
 /* @brief
@@ -325,16 +325,16 @@ typedef struct
  */
 typedef struct
 {
-	ZB11_snddata_framehead ZB11_framehead;					// ZigBee帧头
+	ZB11_snddata_framehead ZB11_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
 	unsigned char dynagraph_mode;									// 功图模式（与功图数据）
-	unsigned char algorithms;												// 算法（与功图数据）这个不知道怎么得到的
+	unsigned char algorithms;										// 算法（与功图数据）这个不知道怎么得到的
 	unsigned short int synchronization_time;						// 同步时间 10ms
-	unsigned short int time_mark;										// 时间标记（ms下死点时间点由功图参数得到）
-	unsigned short int cycle;												// 周期（无符号整数，10ms，由功图参数得到）
-	unsigned short int dot;													// 点数（无符号整数型，由功图参数得到）
+	unsigned short int time_mark;									// 时间标记（ms下死点时间点由功图参数得到）
+	unsigned short int cycle;										// 周期（无符号整数，10ms，由功图参数得到）
+	unsigned short int dot;											// 点数（无符号整数型，由功图参数得到）
 	unsigned char 	company_func[10];								// 厂家功能
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_rsp_currentchart;
 
 /* @brief
@@ -345,16 +345,16 @@ typedef struct
  */
 typedef struct
 {
-	ZB91_revdata_framehead ZB91_framehead;					// ZigBee帧头
+	ZB91_revdata_framehead ZB91_framehead;							// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char data_serialnum;										// 数据组顺序号
-	unsigned char reserved;													// 保留
+	unsigned char data_serialnum;									// 数据组顺序号
+	unsigned char reserved;											// 保留
 	unsigned char dynagraph_mode;									// 功图模式
-	unsigned char algorithms;												// 算法
+	unsigned char algorithms;										// 算法
 	unsigned short int synchronization_time;						// 同步时间
-	unsigned short int time_mark;										// 时间标记
-	unsigned short int dot;													// 点数（无符号整数型，与功图参数相同）
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned short int time_mark;									// 时间标记
+	unsigned short int dot;											// 点数（无符号整数型，与功图参数相同）
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_req_elec_first;
 
 /* @brief
@@ -365,12 +365,12 @@ typedef struct
  */
 typedef struct
 {
-	ZB91_revdata_framehead ZB91_framehead;  					// ZigBee帧头
+	ZB91_revdata_framehead ZB91_framehead;  						// ZigBee帧头
 	A11_data_framehead A11_framehead;								// A11数据帧头 10B
-	unsigned char data_serialnum;										// 数据组顺序号
-	unsigned char reserved;													// 保留
+	unsigned char data_serialnum;									// 数据组顺序号
+	unsigned char reserved;											// 保留
 	unsigned short int current_chart[30];							// 电流图
-	unsigned char check_sum;												// ZigBee校验和
+	unsigned char check_sum;										// ZigBee校验和
 }__attribute__((packed)) A11_req_elec_others;
 
 #endif /* SRC_SEVER_SERIALZIGBEE_SERIALZIGBEE_H_ */

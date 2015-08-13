@@ -29,6 +29,7 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename);
 int getA11Configure(E1_sys_attribute *psysattr);
 static int manufacturersParamInit(manufacturers_of_custom * pobj);
 static int manufacturersParamToFile(manufacturers_of_custom * pobj);
+static int getManufacturesParam(manufacturers_of_custom * pobj);
 oil_well *poilwell[17];
 
 E1_sys_attribute* LoadConfigA11(void)
@@ -64,9 +65,17 @@ E1_sys_attribute* LoadConfigA11(void)
 				zlog_info(c, "初始化数据格式为油井格式");
 				for(n = 0; n < 17; n ++)
 					poilwell[n] = (oil_well *)(mb_mapping[n]->tab_registers + sizeof(E1_sys_attribute) / 2);
-
-				manufacturersParamInit(&poilwell[0]->fuction_param.custom);
-				manufacturersParamToFile(&poilwell[0]->fuction_param.custom);
+				zlog_info(c, "从配置文件中读入厂家自定义配置");
+				res = getManufacturesParam(&poilwell[0]->fuction_param.custom);
+				if(res != 0)
+				{
+					zlog_warn(c, "未能从配置文件中读出厂家自定义参数");
+					zlog_info(c, "从程序中读入厂家自定义默认配置");
+					manufacturersParamInit(&poilwell[0]->fuction_param.custom);
+					res =manufacturersParamToFile(&poilwell[0]->fuction_param.custom);
+					if(res != 0)
+						zlog_warn(c, "未能将厂家自定义配置参数写入配置文件");
+				}
 //				poilwell[0]->fuction_param.custom.oilwell_ID[0] = 0x01;
 //				poilwell[0]->fuction_param.custom.oilwell_ID[1] = 0x02;
 				break;
@@ -596,12 +605,88 @@ static int manufacturersParamInit(manufacturers_of_custom * pobj)
 }
 static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 {
-	char str[32];
+	char str[64];
+	// IPv6
+	sprintf(str,"%d",pobj->IP_extern.IPv6_master_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_master_port",str,A11filename)) return -1;
+	sprintf(str,"%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",pobj->IP_extern.IPv6_master_ip[0],	\
+				pobj->IP_extern.IPv6_master_ip[1],	\
+				pobj->IP_extern.IPv6_master_ip[2],	\
+				pobj->IP_extern.IPv6_master_ip[3],	\
+				pobj->IP_extern.IPv6_master_ip[4],	\
+				pobj->IP_extern.IPv6_master_ip[5],	\
+				pobj->IP_extern.IPv6_master_ip[6],	\
+				pobj->IP_extern.IPv6_master_ip[7]);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_master_ip",str,A11filename)) return -1;
+
+	sprintf(str,"%d",pobj->IP_extern.IPv6_tcp_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_tcp_port",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv6_upd_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_upd_port",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv6_access);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_access",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv6_tcp_udp_identity);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_tcp_udp_identity",str,A11filename)) return -1;
+
+	sprintf(str,"%d:%d:%d:%d:%d:%d:%d:%d",pobj->IP_extern.IPv6_gateway[0],	\
+				pobj->IP_extern.IPv6_gateway[1],	\
+				pobj->IP_extern.IPv6_gateway[2],	\
+				pobj->IP_extern.IPv6_gateway[3],	\
+				pobj->IP_extern.IPv6_gateway[4],	\
+				pobj->IP_extern.IPv6_gateway[5],	\
+				pobj->IP_extern.IPv6_gateway[6],	\
+				pobj->IP_extern.IPv6_gateway[7]);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_gateway",str,A11filename)) return -1;
+
+	sprintf(str,"%d",pobj->IP_extern.IPv6_prefix_len);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_prefix_len",str,A11filename)) return -1;
+
+	sprintf(str,"%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",pobj->IP_extern.IPv6_ip[0],	\
+				pobj->IP_extern.IPv6_ip[1],	\
+				pobj->IP_extern.IPv6_ip[2],	\
+				pobj->IP_extern.IPv6_ip[3],	\
+				pobj->IP_extern.IPv6_ip[4],	\
+				pobj->IP_extern.IPv6_ip[5],	\
+				pobj->IP_extern.IPv6_ip[6],	\
+				pobj->IP_extern.IPv6_ip[7]);
+	if (!write_profile_string("manufacturers_of_custom","IPv6_ip",str,A11filename)) return -1;
+
+	// IPv4
+	sprintf(str,"%d",pobj->IP_extern.IPv4_master_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_master_port",str,A11filename)) return -1;
+
+	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_master_ip[0],	\
+			pobj->IP_extern.IPv4_master_ip[1],	\
+			pobj->IP_extern.IPv4_master_ip[2],	\
+			pobj->IP_extern.IPv4_master_ip[3]);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_master_ip",str,A11filename)) return -1;
+
+	sprintf(str,"%d",pobj->IP_extern.IPv4_tcp_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_tcp_port",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv4_upd_port);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_upd_port",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv4_access);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_access",str,A11filename)) return -1;
+	sprintf(str,"%d",pobj->IP_extern.IPv4_tcp_udp_identity);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_tcp_udp_identity",str,A11filename)) return -1;
+
+	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_gateway[0],
+			pobj->IP_extern.IPv4_gateway[1],
+			pobj->IP_extern.IPv4_gateway[2],
+			pobj->IP_extern.IPv4_gateway[3]);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_gateway",str,A11filename)) return -1;
+
+	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_subnet_mask[0],
+			pobj->IP_extern.IPv4_subnet_mask[1],
+			pobj->IP_extern.IPv4_subnet_mask[2],
+			pobj->IP_extern.IPv4_subnet_mask[3]);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_subnet_mask",str,A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_ip[0],	\
 			pobj->IP_extern.IPv4_ip[1],	\
 			pobj->IP_extern.IPv4_ip[2],	\
 			pobj->IP_extern.IPv4_ip[3]);
+	if (!write_profile_string("manufacturers_of_custom","IPv4_ip",str,A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->IP_extern.comm_duplex);
 	if (!write_profile_string("manufacturers_of_custom","comm_duplex",str,A11filename)) return -1;
@@ -612,7 +697,7 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 			pobj->IP_extern.mac[3],	\
 			pobj->IP_extern.mac[4],	\
 			pobj->IP_extern.mac[5]);
-		if (!write_profile_string("manufacturers_of_custom","mac_address",str,A11filename)) return -1;;
+	if (!write_profile_string("manufacturers_of_custom","mac_address",str,A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->switch_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","switch_patroltime",str,A11filename)) return -1;
@@ -662,6 +747,124 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 	if (!write_profile_string("manufacturers_of_custom","data_transfer_mode",str,A11filename)) return -1;
 	sprintf(str,"%d",pobj->communication_protocols);
 	if (!write_profile_string("manufacturers_of_custom","communication_protocols",str,A11filename)) return -1;
+	return 0;
+}
+/*
+ * 从配置文件获取厂家自定义参数
+ */
+static int getManufacturesParam(manufacturers_of_custom * pobj)
+{
+	const int str_size = 64;
+	char  str[str_size];
+
+	pobj->communication_protocols = read_profile_int("manufacturers_of_custom","communication_protocols",-1,A11filename);
+	if(pobj->communication_protocols == -1)	return -1;
+	pobj->heartbeat_sta = read_profile_int("manufacturers_of_custom","heartbeat_sta",-1,A11filename);
+	if(pobj->heartbeat_sta == -1)	return -1;
+	pobj->non_heartbeat_interval = read_profile_int("manufacturers_of_custom","non_heartbeat_interval",-1,A11filename);
+	if(pobj->non_heartbeat_interval == -1)	return -1;
+	pobj->heartbeat_interval = read_profile_int("manufacturers_of_custom","heartbeat_interval",-1,A11filename);
+	if(pobj->heartbeat_interval == -1)	return -1;
+	pobj->patrol_num = read_profile_int("manufacturers_of_custom","patrol_num",-1,A11filename);
+	if(pobj->patrol_num == -1)	return -1;
+	pobj->dynagraph_mode = read_profile_int("manufacturers_of_custom","dynagraph_mode",-1,A11filename);
+	if(pobj->dynagraph_mode == -1)	return -1;
+	pobj->dynagraph_dot = read_profile_int("manufacturers_of_custom","dynagraph_dot",-1,A11filename);
+	if(pobj->dynagraph_dot == -1)	return -1;
+	pobj->elec_switch = read_profile_int("manufacturers_of_custom","elec_switch",-1,A11filename);
+	if(pobj->elec_switch == -1)	return -1;
+	pobj->offline_savedata_switch = read_profile_int("manufacturers_of_custom","offline_savedata_switch",-1,A11filename);
+	if(pobj->offline_savedata_switch == -1)	return -1;
+	pobj->A1alram_switch = read_profile_int("manufacturers_of_custom","A1alram_switch",-1,A11filename);
+	if(pobj->A1alram_switch == -1)	return -1;
+	pobj->A1alram_upload_cycle = read_profile_int("manufacturers_of_custom","A1alram_upload_cycle",-1,A11filename);
+	if(pobj->A1alram_upload_cycle == -1)	return -1;
+	pobj->update_packet_size = read_profile_int("manufacturers_of_custom","update_packet_size",-1,A11filename);
+	if(pobj->update_packet_size == -1)	return -1;
+
+	pobj->dynagraph_patroltime = read_profile_int("manufacturers_of_custom","dynagraph_patroltime",-1,A11filename);
+	if(pobj->dynagraph_patroltime == -1)	return -1;
+	pobj->press_patroltime = read_profile_int("manufacturers_of_custom","press_patroltime",-1,A11filename);
+	if(pobj->press_patroltime == -1)	return -1;
+	pobj->tempreture_patroltime = read_profile_int("manufacturers_of_custom","tempreture_patroltime",-1,A11filename);
+	if(pobj->tempreture_patroltime == -1)	return -1;
+	pobj->elec_patroltime = read_profile_int("manufacturers_of_custom","elec_patroltime",-1,A11filename);
+	if(pobj->elec_patroltime == -1)	return -1;
+	pobj->angledisplacement_patroltime = read_profile_int("manufacturers_of_custom","angledisplacement_patroltime",-1,A11filename);
+	if(pobj->angledisplacement_patroltime == -1)	return -1;
+	pobj->load_patroltime = read_profile_int("manufacturers_of_custom","load_patroltime",-1,A11filename);
+	if(pobj->load_patroltime == -1)	return -1;
+	pobj->touque_patroltime = read_profile_int("manufacturers_of_custom","touque_patroltime",-1,A11filename);
+	if(pobj->touque_patroltime == -1)	return -1;
+	pobj->liquid_patroltime = read_profile_int("manufacturers_of_custom","liquid_patroltime",-1,A11filename);
+	if(pobj->liquid_patroltime == -1)	return -1;
+	pobj->rpm_patroltime = read_profile_int("manufacturers_of_custom","rpm_patroltime",-1,A11filename);
+	if(pobj->rpm_patroltime == -1)	return -1;
+	pobj->analog_patroltime = read_profile_int("manufacturers_of_custom","analog_patroltime",-1,A11filename);
+	if(pobj->analog_patroltime == -1)	return -1;
+	pobj->switch_patroltime = read_profile_int("manufacturers_of_custom","switch_patroltime",-1,A11filename);
+	if(pobj->switch_patroltime == -1)	return -1;
+	// IPv4
+	if(!read_profile_string("manufacturers_of_custom","IPv4_ip",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(".",str, pobj->IP_extern.IPv4_ip);
+	pobj->IP_extern.comm_duplex = read_profile_int("manufacturers_of_custom","comm_duplex",-1,A11filename);
+	if(pobj->IP_extern.comm_duplex == -1)	return -1;
+	if(!read_profile_string("manufacturers_of_custom","IPv4_subnet_mask",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(".",str, pobj->IP_extern.IPv4_subnet_mask);
+	if(!read_profile_string("manufacturers_of_custom","IPv4_gateway",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(".",str, pobj->IP_extern.IPv4_gateway);
+	pobj->IP_extern.IPv4_tcp_udp_identity = read_profile_int("manufacturers_of_custom","IPv4_tcp_udp_identity",-1,A11filename);
+	if(pobj->IP_extern.IPv4_tcp_udp_identity == -1)	return -1;
+	pobj->IP_extern.IPv4_access = read_profile_int("manufacturers_of_custom","IPv4_access",-1,A11filename);
+	if(pobj->IP_extern.IPv4_access == -1)	return -1;
+	pobj->IP_extern.IPv4_upd_port = read_profile_int("manufacturers_of_custom","IPv4_upd_port",-1,A11filename);
+	if(pobj->IP_extern.IPv4_upd_port == -1)	return -1;
+	pobj->IP_extern.IPv4_tcp_port = read_profile_int("manufacturers_of_custom","IPv4_tcp_port",-1,A11filename);
+	if(pobj->IP_extern.IPv4_tcp_port == -1)	return -1;
+
+	if(!read_profile_string("manufacturers_of_custom","IPv4_master_ip",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(".",str, pobj->IP_extern.IPv4_master_ip);
+
+	pobj->IP_extern.IPv4_master_port = read_profile_int("manufacturers_of_custom","IPv4_master_port",-1,A11filename);
+	if(pobj->IP_extern.IPv4_master_port == -1)	return -1;
+	// IPv6
+	if(!read_profile_string("manufacturers_of_custom","IPv6_ip",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(":",str, pobj->IP_extern.IPv6_ip);
+
+	pobj->IP_extern.IPv6_prefix_len = read_profile_int("manufacturers_of_custom","IPv6_prefix_len",-1,A11filename);
+	if(pobj->IP_extern.IPv6_prefix_len == -1)	return -1;
+
+	if(!read_profile_string("manufacturers_of_custom","IPv6_gateway",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(":",str, pobj->IP_extern.IPv6_gateway);
+
+	pobj->IP_extern.IPv6_tcp_udp_identity = read_profile_int("manufacturers_of_custom","IPv6_tcp_udp_identity",-1,A11filename);
+	if(pobj->IP_extern.IPv6_tcp_udp_identity == -1)	return -1;
+	pobj->IP_extern.IPv6_access = read_profile_int("manufacturers_of_custom","IPv6_access",-1,A11filename);
+	if(pobj->IP_extern.IPv6_access == -1)	return -1;
+	pobj->IP_extern.IPv6_upd_port = read_profile_int("manufacturers_of_custom","IPv6_upd_port",-1,A11filename);
+	if(pobj->IP_extern.IPv6_upd_port == -1)	return -1;
+	pobj->IP_extern.IPv6_tcp_port = read_profile_int("manufacturers_of_custom","IPv6_tcp_port",-1,A11filename);
+	if(pobj->IP_extern.IPv6_tcp_port == -1)	return -1;
+
+	pobj->IP_extern.IPv6_master_port = read_profile_int("manufacturers_of_custom","IPv6_master_port",-1,A11filename);
+	if(pobj->IP_extern.IPv6_master_port == -1)	return -1;
+
+	if(!read_profile_string("manufacturers_of_custom","IPv6_master_ip",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(":",str, pobj->IP_extern.IPv6_master_ip);
 	return 0;
 }
 //RTU_baseinfo* baseinfoInit(void)

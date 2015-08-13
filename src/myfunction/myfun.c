@@ -12,7 +12,7 @@
 
 int myIPtoa(char *obj,char* ip,unsigned short int *a)
 {
-	char ipp[32] = {0};
+	char ipp[64] = {0};
 	char *q;
 	char *token;
 //	char *temp = ":";

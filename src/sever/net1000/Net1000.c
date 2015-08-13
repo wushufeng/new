@@ -208,7 +208,7 @@ int net1000Init(void *obj)
 					psysattr->commparam.ip_address[2],
 					psysattr->commparam.ip_address[3]);
 	    	port = psysattr->commparam.tcp_port;
-	    	zlog_info(c, "Net1000作为服务器工作在TCP模式下，本地IP：%s, 服务端口:%d\n", ip, port);
+	    	zlog_info(c, "Net1000作为服务器工作在TCP模式下，本地IP：%s, 服务端口:%d", ip, port);
 			break;
 		case MCM_UDP_SERVER:
 
