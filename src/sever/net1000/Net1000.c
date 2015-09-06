@@ -155,7 +155,7 @@ static int net1000ThreadFunc(void *arg)
 	        }
 	        if(net_slave == 128)
 	        	net_slave = 0;
-			rc_net1000 = modbus_reply(ctx_net1000, query_net1000, rc_net1000, mb_mapping[net_slave]);
+			rc_net1000 = modbus_reply(ctx_net1000, query_net1000, rc_net1000, (modbus_mapping_t *)mb_mapping[net_slave]);
 			if (rc_net1000 == -1) {
 //				break;
 				goto disconnect;

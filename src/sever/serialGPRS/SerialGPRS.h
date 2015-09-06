@@ -8,6 +8,8 @@
 #ifndef SRC_SEVER_SERIALGPRS_SERIALGPRS_H_
 #define SRC_SEVER_SERIALGPRS_SERIALGPRS_H_
 
+
+
 int serialGprsInit(void *obj);
 int createGprsThread(void);
 void serialGprsFree();

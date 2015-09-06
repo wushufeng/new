@@ -18,13 +18,18 @@
 #include <time.h>
 
 #include "SerialZigbee.h"
+
 #include "../../A11_sysAttr/a11sysattr.h"
 #include "../../database/database.h"
 #include "../../modbus/modbus-private.h"
 #include "../sysdatetime/getsysdatetime.h"
 #include "../../log/rtulog.h"
-//#define 	ZIGBEEDEVICE			"/dev/ttyS3"
+#include "../../def.h"
+#ifdef ARM_32
+#define 	ZIGBEEDEVICE			"/dev/ttyS3"
+#else
 #define 	ZIGBEEDEVICE			"/dev/ttyUSB0"
+#endif
 modbus_t *ctx_zigbee;
 int use_backend_zigbee;
 unsigned short int *tab_rp_registers;
@@ -302,7 +307,7 @@ int serialZigbeeCancel(void)
 	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
 		zlog_warn(c, "SerialZigbee线程不存在或者已经退出");
 	else if(kill_rc == EINVAL)		// 信号不合法：EINVAL
-		zlog_warn(c, "signal is invalid/n");
+		zlog_warn(c, "非法信号");
 	else
 	{
 		res = pthread_cancel(zigbee_thread);
@@ -345,14 +350,14 @@ static int receive_msg_zigbee(modbus_t *ctx, uint8_t *msg, msg_type_t msg_type)
  */
 {
     int rc;
-    fd_set rfds;									// 申请一组文件描述符集合
+    fd_set rfds;							// 申请一组文件描述符集合
     struct timeval tv;						// 延时时间结构体
     struct timeval *p_tv;					// 延时时间结构体指针,用于指向此类结构体
     int length_to_read;
-    int msg_length = 0;					// 此变量中保存已经读入数组msg中的字节个数
+    int msg_length = 0;						// 此变量中保存已经读入数组msg中的字节个数
     _step_t step;
 
-    if (ctx->debug) {							// 如果是debug模式显示当前状态
+    if (ctx->debug) {						// 如果是debug模式显示当前状态
         if (msg_type == MSG_INDICATION) {
             zlog_debug(c, "等待ZigBee设备发送指令...");
         } else {

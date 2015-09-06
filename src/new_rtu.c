@@ -4,13 +4,13 @@
  *  Created on: 2015年3月20日
  *      Author: wsf
  */
-# include <stdio.h>
-# include <stdlib.h>
-# include <unistd.h>
-# include <errno.h>
-# include <string.h>
-# include <pthread.h>
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <stdarg.h>
 
 #include "./log/rtulog.h"
 #include "def.h"
@@ -37,6 +37,19 @@ char SysIniFile[MAXBUFSIZE];//系统ini文件
 E1_sys_attribute *psysattr;
 //extern oil_well *poilwell[16];
 //pthread_mutex_t holdingReg_mutex;
+//char tt[1024];
+//void u2_printf(char *dest, char* fmt,...);
+//
+//void u2_printf(char *dest, char *fmt,...)
+//{
+//	va_list ap;
+//	va_start(ap,fmt);
+//	vsprintf((char*)dest,fmt,ap);
+//	va_end(ap);
+//}
+
+//void mb_mapping_free(mb_mapping_t *mb_mapping);
+
 int main(int argc, char *argv[])
 {
 
@@ -44,6 +57,9 @@ int main(int argc, char *argv[])
 	char cCh;
 	char bDoExit ;
 	int n;
+
+	int zigbee_en = 0;
+	int gprs_en = 1;
 	// zlog
 	if((res = Zlog_init()) != 0)
 		return res;
@@ -68,6 +84,7 @@ int main(int argc, char *argv[])
 //        exit(EXIT_FAILURE);
 //    }
 ////     开辟20000个空间,用于mb保持寄存器
+//	u2_printf(tt, "测试测试!!!!%s%s%s%d", "1", "2", "3",4);printf("%s\n", tt);
 	zlog_info(c, "**************RTU程序启动*****************");
 	zlog_info(c, "RTU日志模块初始化完毕");
 //	zlog_debug(c, "MBMapping数据空间错误!");
@@ -109,6 +126,31 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 	}
+	/*@brief
+	 * wsf
+	 * TCP
+	 */
+	//////////////////////////////////////////////////////////
+//    if(0)
+	if((psysattr->commparam.communication_mode == CM_GPRS_CDMA) && (gprs_en))
+	{
+		zlog_info(c, "GPRS正在初始化...");
+		res = serialGprsInit((void *) psysattr);
+		if(res == 0)
+		{
+			zlog_info(c, "GPRS初始化完成");
+			zlog_info(c, "启动GPRS线程");
+			res = createGprsThread();
+		    if(res != 0)
+		    {
+		    	zlog_error(c, "GPRS线程创建失败");
+		        exit(EXIT_FAILURE);
+		    }
+		}
+		else
+			zlog_error(c, "GPRS初始化失败");
+	}
+	/////////////////////////////////////////////////////////////
 	/*@brief
 	 * wsf
 	 * TCP
@@ -158,7 +200,7 @@ int main(int argc, char *argv[])
 	 * wsf
 	 * Zigbee
 	 */
-	if(psysattr->commparam.downlink_comm_interface == DCI_ZIGBEE)
+	if((psysattr->commparam.downlink_comm_interface == DCI_ZIGBEE) && (zigbee_en))
 	{
 		zlog_info(c, "ZigBee正在初始化...");
 		res = serialZigbeeInit((void *) psysattr);
@@ -225,9 +267,11 @@ int main(int argc, char *argv[])
 	databaseThreadCancel();
 	AIDIThreadCancel();
 	net1000ThreadCancel();
-	serialZigbeeCancel();
+	if(zigbee_en)
+		serialZigbeeCancel();
 //	serial232ThreadCancel();
-//	serialGPRSThreadCancel();
+	if(gprs_en)
+		serialGPRSThreadCancel();
 
 
 //	if(psysattr != NULL)
@@ -235,14 +279,29 @@ int main(int argc, char *argv[])
 	for(n = 0; n < 16; n ++)
 	{
 		if(mb_mapping[n] !=NULL)
-			modbus_mapping_free(mb_mapping[n]);
+			modbus_mapping_free(mb_mapping[n]); // modbus_mapping_t
+//			mb_mapping_free(mb_mapping[n]);
 	}
 	zlog_info(c, "正在释放内存...");
 	net1000Free();
 //	serial232Free();
-	serialZigbeeFree();
-	serialGprsFree();
+	if(zigbee_en)
+		serialZigbeeFree();
+//	if(gprs_en)
+//		serialGprsFree();
 	zlog_info(c, "**************RTU程序正常退出*****************");
 	zlog_fini();
 	exit(EXIT_SUCCESS);
 }
+//void mb_mapping_free(mb_mapping_t *mb_mapping)
+//{
+//    if (mb_mapping == NULL) {
+//        return;
+//    }
+//
+//    free(mb_mapping->tab_input_registers);
+//    free(mb_mapping->tab_registers);
+//    free(mb_mapping->tab_input_bits);
+//    free(mb_mapping->tab_bits);
+//    free(mb_mapping);
+//}

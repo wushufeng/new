@@ -28,18 +28,17 @@ We can calculate the result: 948 x 3222 = 3.0V
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include<sys/time.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <string.h>
-#include <stdint.h>
+//#include <stdint.h>
 #include <string.h>
 
 
-
-
-//#include "../../modbus/modbus.h"
-#include "../../A11_sysAttr/a11sysattr.h"
 #include "a5d35ai.h"
+
+#include "../../def.h"
+#include "../../A11_sysAttr/a11sysattr.h"
 #include "../../log/rtulog.h"
 
 extern E1_sys_attribute *psysattr;
@@ -54,9 +53,9 @@ int AIDIThreadCancel(void)
 {
 	int res;
 	void * thread_result;
-	int kill_rc = 0;
 
-	kill_rc = pthread_kill(aidi_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
+
+	int kill_rc = pthread_kill(aidi_thread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
 	zlog_info(c, "正在取消AIDI线程...");
 	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
 		zlog_warn(c, "AIDI线程不存在或者已经退出");
@@ -111,8 +110,9 @@ static int aidiThreadFunc(void *arg)
 	}
 	for(;;)
 	{
-//		a5d3ad_get_ad(ai_data, 0, 10);
-
+#ifdef ARM_32
+		a5d3ad_get_ad(ai_data, 0, 10);
+#endif
 		voltage_scale = ai_data[0];
 
 //		printf("voltage_scale = %d ", voltage_scale);
@@ -253,7 +253,7 @@ static int  a5d3ad_get_ad(unsigned short int *dest, int index, unsigned short in
  */
 static void modbus_set_float_swapped(float f, unsigned short int *dest)
 {
-    uint32_t i = 0;
+	unsigned int i = 0;
 
     memcpy(&i, &f, sizeof(unsigned int));
     dest[1] = (unsigned short int)i;

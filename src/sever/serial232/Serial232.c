@@ -81,7 +81,7 @@ static int serial232ThreadFunc(void *arg)
         }
         if(serial_slave == 128)
         	serial_slave = 0;
-        rc = modbus_reply(ctx_serial232, query_serial232, rc, mb_mapping[serial_slave]);
+        rc = modbus_reply(ctx_serial232, query_serial232, rc, (modbus_mapping_t *)mb_mapping[serial_slave]);
         if (rc == -1) {
             break;
         }
