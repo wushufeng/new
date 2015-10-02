@@ -9,7 +9,8 @@
 #define SRC_SEVER_SERIALZIGBEE_SERIALZIGBEE_H_
 
 int zbInit(void *obj);
-int createZbThread(void);
+int createZbThread(void *argv);
+//int createZbThread(void);
 int cancelZbThread(void);
 int zbFree();
 

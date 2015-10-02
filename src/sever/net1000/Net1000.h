@@ -11,7 +11,7 @@
 
 
 //int net1000Init(ParamConfiguration *obj);
-int createNet1000Thread(void);
+int createNet1000Thread(void *argv);
 int net1000Init(void *obj);
 int net1000Start();
 int net1000ThreadCancel(void);

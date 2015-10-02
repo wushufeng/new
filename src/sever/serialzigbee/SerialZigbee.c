@@ -33,7 +33,7 @@
 #ifdef ARM_32
 #define 	ZBDEVICE			"/dev/ttyS3"
 #else
-#define 	ZBDEVICE			"/dev/ttyUSB0"
+#define 	ZBDEVICE			"/dev/ttyUSB1"
 #endif
 
 comm_t *zb_fd;
@@ -105,11 +105,22 @@ static int zbThreadFunc(void *arg)
 		zlog_error(c, "ZigBee线程pthread_setcanceltype失败");
 		pthread_exit("2");
 	}
-
+	char *ptr = NULL;
+	if(arg != NULL) {
+		ptr = strstr((const char *)arg, "debug");
+		if(ptr != NULL)
+		{
+			comm_set_debug(zb_fd, 1);
+		}
+	}
 	res = comm_connect(zb_fd);
     if (res == -1) {
         zlog_error(c, "ZigBee接口建立连接失败! %s", strerror(errno));
-        comm_free(zb_fd);
+    	if(zb_fd != NULL)
+    	{
+    		comm_free(zb_fd);
+    		zb_fd = NULL;
+     	}
         pthread_exit("3");
     }
     else
@@ -132,15 +143,15 @@ static int zbThreadFunc(void *arg)
     		continue;
     	}
     	// 显示接收到得数据
-        if (zb_fd->debug) {
-            int i;
-            if(data_len)
-            	printf(">> ");
-            for (i=0; i < data_len; i++)
-            	printf("%.2X ", zb_rev_buf[i]);
-            if(data_len)
-            	printf("\n");
-        }
+//        if (zb_fd->debug) {
+//            int i;
+//            if(data_len)
+//            	printf(">> ");
+//            for (i=0; i < data_len; i++)
+//            	printf("%.2X", zb_rev_buf[i]);
+//            if(data_len)
+//            	printf("\n");
+//        }
 
         res = zbReply(zb_fd, zb_rev_buf, rc, zb_snd_buf);
         if (res == -1) {
@@ -162,7 +173,6 @@ int zbInit(void *obj)
 	char parity;
 	int data_bit;
 	int stop_bit;
-//	use_backend_zigbee = ZIGBEE;
 	switch (psysattr->commparam.comm_baudrate)
 	{
 		case C_BAUD_1200:
@@ -260,11 +270,12 @@ int zbInit(void *obj)
  * @brief
  * 创建zigbee线程
  */
-int createZbThread(void)
+int createZbThread(void *argv)
+//int createZbThread(void )
 {
 	int res;
-	res = pthread_create(&zb_thread, NULL, (void*)&zbThreadFunc, NULL);
-    if(res != 0)
+	res = pthread_create(&zb_thread, NULL, (void*)&zbThreadFunc, argv);
+	if(res != 0)
     {
     	zlog_error(c, "创建SerialZigBee线程失败:%s", modbus_strerror(errno));
         return (-1);

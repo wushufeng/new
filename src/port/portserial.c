@@ -143,7 +143,7 @@ int comm_connect(comm_t *ctx)
     if (ctx->s == -1) {
 //        fprintf(stderr, "ERROR Can't open the device %s (%s)\n",
 //        		ctx_gprs->device, strerror(errno));
-        zlog_error(c, "GPRS不能打开设备端口 %s (%s)",
+        zlog_error(c, "不能打开设备端口 %s (%s)",
         		ctx_opt->device, strerror(errno));
         return -1;
     }
@@ -452,8 +452,9 @@ inline int comm_send(comm_t *ctx, unsigned char *req, int req_length)
 	int rc;
 	int i;
     if (ctx->debug) {
+    	printf("<< ");
         for (i = 0; i < req_length; i++)
-            printf("[%.2X]", req[i]);
+            printf("%.2X", req[i]);
         printf("\n");
     }
     /* In recovery mode, the write command will be issued until to be
@@ -713,6 +714,15 @@ int mbRead(comm_t *ctx, unsigned char *msg, int msg_type, int length_to_read)
             tv.tv_usec = ctx->byte_timeout.tv_usec;
             p_tv = &tv;
         }
+    }
+    if (ctx->debug) {
+        int i;
+        if(msg_length)
+        	printf(">> ");
+        for (i=0; i < msg_length; i++)
+        	printf("%.2X", msg[i]);
+        if(msg_length)
+        	printf("\n");
     }
     return msg_length;
 }

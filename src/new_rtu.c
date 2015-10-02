@@ -26,7 +26,6 @@
 #include "./sever/serial232/Serial232.h"
 #include "./sever/net1000/Net1000.h"
 #include "./sever/serialzigbee/SerialZigbee.h"
-//#include "./sever/serialzigbee/zigbee.h"
 #include "./sever/serialGPRS/SerialGPRS.h"
 #include "./sever/AI8/a5d35ai.h"
 #include "common/common.h"
@@ -61,8 +60,8 @@ int main(int argc, char *argv[])
 	char bDoExit ;
 	int n;
 	ser_sta_t ser_sta = {0, 0, 0, 0, 0, 0};
-	int zigbee_en = 1;
-	int gprs_en = 0;
+	int zigbee_en = 0;
+	int gprs_en = 1;
 	int net_en = 1;
 	int s232_en = 0;
 
@@ -201,7 +200,7 @@ int main(int argc, char *argv[])
 			zlog_info(c, "Net1000初始化完成");
 			zlog_info(c, "启动Net1000线程");
 			ser_sta.net_sta = 1;
-			res = createNet1000Thread();
+			res = createNet1000Thread(argv[1]);
 		    if(res != 0)
 		    {
 		    	zlog_error(c, "Net1000线程创建失败");
@@ -240,15 +239,13 @@ int main(int argc, char *argv[])
 	if((psysattr->commparam.downlink_comm_interface == DCI_ZIGBEE) && (zigbee_en))
 	{
 		zlog_info(c, "ZigBee正在初始化...");
-//		res = serialZigbeeInit((void *) psysattr);
 		res = zbInit((void *) psysattr);
 		if(res == 0)
 		{
 			zlog_info(c, "ZigBee初始化完成");
 			zlog_info(c, "启动ZigBee线程");
 			ser_sta.zigbee_sta = 1;
-//			res = createZigbeeThread();
-			res = createZbThread();
+			res = createZbThread(argv[1]);
 		    if(res != 0)
 		    {
 		    	zlog_error(c, "ZigBee线程创建失败");
@@ -335,9 +332,7 @@ int main(int argc, char *argv[])
 	if(ser_sta.rs232_sta)
 		serial232Free();
 	if(ser_sta.zigbee_sta)
-//		serialZigbeeFree();
 		zbFree();
-//	zlog_info(c, "serialGprsFree();");
 	if(ser_sta.gprs_sta)
 		serialGprsFree();
 	zlog_info(c, "*********************************************");

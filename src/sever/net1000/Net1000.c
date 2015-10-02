@@ -66,43 +66,51 @@ static int net1000ThreadFunc(void *arg)
 		zlog_error(c, "Net1000线程pthread_setcanceltype失败-%d", res);
 		exit(EXIT_FAILURE);
 	}
-	 if (use_backend_net1000 == TCP)
-	 {
-			switch(comm_mode)					// 主站通信方式
+	char *ptr = NULL;
+	if(arg != NULL) {
+		ptr = strstr((const char *)arg, "debug");
+		if(ptr != NULL)
+		{
+			modbus_set_debug(ctx_net1000, TRUE);
+		}
+	}
+	if (use_backend_net1000 == TCP)
+	{
+		switch(comm_mode)					// 主站通信方式
+		{
+			case MCM_INVALID:																		// 无效
+
+				break;
+			case MCM_GPRS_CDMA:																// GPRS/CDMA
+
+				break;
+			case MCM_TCP_SERVER:
 			{
-				case MCM_INVALID:																		// 无效
-
-					break;
-				case MCM_GPRS_CDMA:																// GPRS/CDMA
-
-					break;
-				case MCM_TCP_SERVER:
+				modbus_tcp_t *ctx_tcp = ctx_net1000->backend_data;
+				zlog_info(c, "Net1000正在尝试连接服务器:%s端口:%d...", ctx_tcp->ip, ctx_tcp->port);
+				res = tcpClientConnect(ctx_net1000);
+	//					sockfd = modbus_tcp_client_socket(ctx_net1000);									// TCP client
+	//					res = modbus_tcp_connect(ctx_net1000);											// TCP client
+				if(res == -1)
 				{
-					modbus_tcp_t *ctx_tcp = ctx_net1000->backend_data;
-					zlog_info(c, "Net1000正在尝试连接服务器:%s端口:%d...", ctx_tcp->ip, ctx_tcp->port);
-					res = tcpClientConnect(ctx_net1000);
-//					sockfd = modbus_tcp_client_socket(ctx_net1000);									// TCP client
-//					res = modbus_tcp_connect(ctx_net1000);											// TCP client
-					if(res == -1)
-					{
-						printf("Net1000无法连接主站");
-					}
-
-					break;
+					printf("Net1000无法连接主站");
 				}
-				case MCM_TCP_CLIENT:
-					zlog_info(c, "Net1000正在监听本地服务端口...");
-					sockfd = modbus_tcp_listen(ctx_net1000, 1);										// TCP server
-					break;
-				case MCM_UDP_SERVER:
 
-					break;
-				case MCM_UDP_CLIENT:
-
-					break;
-				default:
-					break;
+				break;
 			}
+			case MCM_TCP_CLIENT:
+				zlog_info(c, "Net1000正在监听本地服务端口...");
+				sockfd = modbus_tcp_listen(ctx_net1000, 1);										// TCP server
+				break;
+			case MCM_UDP_SERVER:
+
+				break;
+			case MCM_UDP_CLIENT:
+
+				break;
+			default:
+				break;
+		}
 	 }
 
     for (;;)
@@ -175,10 +183,10 @@ static int net1000ThreadFunc(void *arg)
     }
     pthread_exit(0);
 }
-int createNet1000Thread(void)
+int createNet1000Thread(void *argv)
 {
 	int res;
-	res = pthread_create(&net1000_thread, NULL, (void*)&net1000ThreadFunc, NULL);
+	res = pthread_create(&net1000_thread, NULL, (void*)&net1000ThreadFunc, argv);
     if(res != 0)
     {
     	zlog_error(c, "创建Net1000线程失败:%s", modbus_strerror(errno));
