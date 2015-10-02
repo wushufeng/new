@@ -32,6 +32,17 @@ typedef struct
 	short int local_minitue;
 	short int local_second;
 }sys_local_time;
+typedef struct
+{
+//	sys_local_time time;
+//	sys_local_date date;
+	unsigned char hour[2];
+	unsigned char min[2];
+	unsigned char sec[2];
+	unsigned char year[2];
+	unsigned char mon[2];
+	unsigned char day[2];
+}sys_date_time;
 
 sys_local_date* getSysLocalDate(time_t syncTime);
 //int setSyslocaldate(void *obj);
@@ -40,7 +51,7 @@ sys_local_time* getSysLocalTime(time_t syncTime);
 int getSysLocalDateTime(void *obj);
 
 int getDynagraphDateTime(void *obj, time_t syncTime);
-
+int setSystemTime(void *dt);
 unsigned char DEC2BCD(const unsigned char decDat);
 unsigned char BCD2DEC(unsigned char bcdDat);
 #endif /* SRC_SYSDATETIME_GETSYSDATETIME_H_ */

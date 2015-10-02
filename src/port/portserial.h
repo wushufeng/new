@@ -50,8 +50,10 @@ void comm_close(comm_t *ctx);
 void comm_free(comm_t *ctx);
 void comm_set_debug(comm_t *ctx, int boolean);
 int comm_set_slave(comm_t *ctx, int slave);
-inline int comm_send(comm_t *ctx, char *req, int req_length);
-inline int comm_read(comm_t *ctx, char *rsp, int rsp_len, int timeout);
-int SerialRead(comm_t *ctx, char * pucBuffer, unsigned short int usNBytes, unsigned short int *usNBytesRead, int timeout);
+inline int comm_send(comm_t *ctx, unsigned char *req, int req_length);
+inline int comm_read(comm_t *ctx, unsigned char *rsp, int rsp_len, int timeout);
+//int SerialRead(comm_t *ctx, unsigned char * pucBuffer, unsigned short int usNBytes, unsigned short int *usNBytesRead, int timeout);
 inline int serialSend(comm_t *ctx, char *fmt,...);
+int mbRead(comm_t *ctx, unsigned char *msg, int msg_type, int length_to_read);
+int gprsRead(comm_t *ctx, unsigned char * pucBuffer, unsigned short int usNBytes, unsigned short int *usNBytesRead, int tm_ms );
 #endif /* SRC_PORT_PORTSERIAL_H_ */

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <errno.h>
 #include "getsysdatetime.h"
 #include "../../A11_sysAttr/a11sysattr.h"
 
@@ -91,6 +92,64 @@ sys_local_date* getSysLocalDate(time_t syncTime)
     p_sys_date->local_day = DEC2BCD(temp);
 
 	return p_sys_date;
+}
+/************************************************
+设置操作系统时间
+参数:*dt数据格式为"2006-4-20 20:30:30"
+调用方法:
+    char *pt="2006-4-20 20:30:30";
+    SetSystemTime(pt);
+**************************************************/
+int setSystemTime(void *dt)
+{
+    struct tm _tm;
+    struct timeval tv;
+    time_t timep;
+    int res;
+//    unsigned char tempH, tempL;
+    sys_date_time * date_time = (sys_date_time *)dt;
+
+
+	_tm.tm_year = BCD2DEC(date_time->year[0]) * 100 + BCD2DEC(date_time->year[1]) - 1900;										// 年
+
+	_tm.tm_mon = BCD2DEC(date_time->mon[1]) - 1;
+
+	_tm.tm_mday = BCD2DEC(date_time->day[1]);
+
+	_tm.tm_hour = BCD2DEC(date_time->hour[1]);
+
+	_tm.tm_min = BCD2DEC(date_time->min[1]);
+
+	_tm.tm_sec = BCD2DEC(date_time->sec[1]);
+
+//	tempL = BCD2DEC(*(unsigned char*)&date_time->date.local_year);					// 内存中高字节在低地址
+//	tempH = BCD2DEC(*((unsigned char*)&date_time->date.local_year +1));
+//	_tm.tm_year = tempH * 100 + tempL - 1900;										// 年
+//
+//	tempL = date_time->date.local_month & 0x00FF ;									// 月
+//	_tm.tm_mon = BCD2DEC(tempL) - 1;
+//
+//	tempL = date_time->date.local_day & 0x00FF ;									// 日
+//	_tm.tm_mday = BCD2DEC(tempL);
+//
+//	tempL = date_time->time.local_hour& 0x00FF ;									// 时
+//	_tm.tm_hour = BCD2DEC(tempL);
+//	tempL = date_time->time.local_minitue & 0x00FF ;									// 分
+//	_tm.tm_min = BCD2DEC(tempL);
+//	tempL = date_time->time.local_second & 0x00FF ;									// 秒
+//	_tm.tm_sec = BCD2DEC(tempL);
+
+    timep = mktime(&_tm);
+    tv.tv_sec = timep;
+    tv.tv_usec = 0;
+    if((res = settimeofday (&tv, (struct timezone *) 0)) < 0)
+    {
+//    	if(errno == EPERM)
+//    		printf("权限不够\n");
+//		printf("设置系统时间失败:%d-res=%d/n", errno, res);
+		return -1;
+    }
+    return 0;
 }
 ///*
 // *  设置本地日期

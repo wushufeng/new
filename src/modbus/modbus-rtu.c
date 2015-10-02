@@ -321,6 +321,7 @@ static int _modbus_rtu_connect(modbus_t *ctx)
         printf("Opening %s at %d bauds (%c, %d, %d)\n",
                ctx_rtu->device, ctx_rtu->baud, ctx_rtu->parity,
                ctx_rtu->data_bit, ctx_rtu->stop_bit);
+
     }
 
 #if defined(_WIN32)
@@ -467,10 +468,12 @@ static int _modbus_rtu_connect(modbus_t *ctx)
 
        Timeouts are ignored in canonical input mode or when the
        NDELAY option is set on the file via open or fcntl */
+//aa:
     ctx->s = open(ctx_rtu->device, O_RDWR | O_NOCTTY | O_NDELAY | O_EXCL);
     if (ctx->s == -1) {
         fprintf(stderr, "ERROR Can't open the device %s (%s)\n",
                 ctx_rtu->device, strerror(errno));
+//        goto aa;
         return -1;
     }
 

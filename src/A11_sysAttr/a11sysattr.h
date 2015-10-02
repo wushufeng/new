@@ -62,7 +62,7 @@ typedef struct
 #define		CM_GPRS_CDMA							1		// GPRS/CDMA
 #define		CM_RS_485								2		// RS485
 #define		CM_WIRELESS_BRIDGES						3		// 无线网桥
-#define		CM_MICWILL								4		//	MicWill
+#define		CM_MICWILL								4		// MicWill
 #define		CM_LTE									5		// LTE
 /*@brief
  * wsf
@@ -102,7 +102,7 @@ typedef struct
  */
 #define		C_NONE						0	// 无校验
 #define 	C_ENEN						1	// 偶校验
-#define 	C_ODD							2	// 奇校验
+#define 	C_ODD						2	// 奇校验
 /*@brief
  * wsf
  * 半/全双工（comm_duplex）预定义
@@ -519,10 +519,11 @@ typedef enum {
  */
 typedef struct
 {
-	unsigned char type;											// 仪表类型
+	// 由于大小端因素,type和group位置对调,addr和num位置对调
 	unsigned char group;										// 仪表组号
-	unsigned char num;											// 仪表编号
+	unsigned char type;											// 仪表类型
 	unsigned char addr;											// 仪表地址
+	unsigned char num;											// 仪表编号
 } __attribute__((packed)) instrument_parameter;
 /* @brief
  * wsf

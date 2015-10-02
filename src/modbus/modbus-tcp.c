@@ -424,10 +424,6 @@ int modbus_tcp_listen(modbus_t *ctx, int nb_connection)
         close(new_socket);
         return -1;
     }
-//	if(connect(new_socket,(struct sockaddr *)&addr,sizeof(addr))<0){
-//		perror("connect error:");
-//		exit(1);
-//	}
     return new_socket;
 }
 

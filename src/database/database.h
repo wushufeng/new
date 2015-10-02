@@ -63,13 +63,23 @@ typedef struct
 	unsigned char upload_flag;														// 是否上传过
 	load_displacement loaddata;
 }__attribute__((packed)) exchangebuffer;
-
-
-
+/**
+ * @brief
+ * 用于仪器信息表的维护
+ */
+typedef struct {
+instrument_parameter instrument;
+time_t start_time;
+time_t interval;
+} instrument_update;
+typedef struct {
+time_t start_time;
+time_t interval;
+} instrument_timeout;
 
 int mbMappingNew(void);
 
 int databaseThreadCancel(void);
 int createDatabaseThread(void);
-int mbWriteSigleRegister(uint16_t address, int data);
+
 #endif /* SRC_DATABASE_DATABASE_H_ */

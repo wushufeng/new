@@ -1,17 +1,17 @@
 /*
  * SerialZigbee.h
  *
- *  Created on: 2015年4月13日
+ *  Created on: Oct 2, 2015
  *      Author: wsf
  */
 
 #ifndef SRC_SEVER_SERIALZIGBEE_SERIALZIGBEE_H_
 #define SRC_SEVER_SERIALZIGBEE_SERIALZIGBEE_H_
 
-int serialZigbeeInit(void *obj);
-int createZigbeeThread(void);
-void serialZigbeeFree();
-int serialZigbeeCancel(void);
+int zbInit(void *obj);
+int createZbThread(void);
+int cancelZbThread(void);
+int zbFree();
 
 
 /* @brief

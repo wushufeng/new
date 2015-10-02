@@ -4,13 +4,18 @@
  *  Created on: 2015年3月25日
  *      Author: wsf
  */
-# include <stdio.h>
-# include <stdlib.h>
-# include <unistd.h>
-# include <errno.h>
-# include <string.h>
-# include <pthread.h>
-# include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <pthread.h>
+#include <arpa/inet.h>
+#include<netdb.h>
+
+//#include	<sys/socket.h>
+//#include	<sys/un.h>
+//#include	<unistd.h>
 
 //#include "../../def.h"
 //#include "../../modbus/modbus.h"
@@ -39,13 +44,17 @@ int comm_mode;					//
 static int net1000ThreadFunc(void *arg);
 static int modbus_tcp_client_socket(modbus_t *ctx);
 static int modbus_tcp_connect(modbus_t *ctx);
-
+static int tcpClientConnect(modbus_t *ctx);
+static char *Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
 
 static int net1000ThreadFunc(void *arg)
 {
 	int res;
 	int net_slave;
 	int net_offset;
+
+
+
 //	modbus_tcp_t *ctx_tcp = ctx_net1000->backend_data;
 	res = pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	if(res != 0)	{
@@ -68,14 +77,19 @@ static int net1000ThreadFunc(void *arg)
 
 					break;
 				case MCM_TCP_SERVER:
-					zlog_info(c, "Net1000正在尝试连接服务器...");
-					sockfd = modbus_tcp_client_socket(ctx_net1000);								// TCP client
-					res = modbus_tcp_connect(ctx_net1000);											// TCP client
-//				 	 if(res == -1)
-//				 	 {
-//				 		 printf("[错误]Net1000无法连接主站%s，服务端口: %d\n",ctx_tcp->ip, ctx_tcp->port);
-//				 	 }
+				{
+					modbus_tcp_t *ctx_tcp = ctx_net1000->backend_data;
+					zlog_info(c, "Net1000正在尝试连接服务器:%s端口:%d...", ctx_tcp->ip, ctx_tcp->port);
+					res = tcpClientConnect(ctx_net1000);
+//					sockfd = modbus_tcp_client_socket(ctx_net1000);									// TCP client
+//					res = modbus_tcp_connect(ctx_net1000);											// TCP client
+					if(res == -1)
+					{
+						printf("Net1000无法连接主站");
+					}
+
 					break;
+				}
 				case MCM_TCP_CLIENT:
 					zlog_info(c, "Net1000正在监听本地服务端口...");
 					sockfd = modbus_tcp_listen(ctx_net1000, 1);										// TCP server
@@ -91,16 +105,19 @@ static int net1000ThreadFunc(void *arg)
 			}
 	 }
 
-    for (;;) {
-	    if (use_backend_net1000 == TCP)
-	    {
-	    	if(comm_mode == MCM_TCP_CLIENT)
-	    		res = modbus_tcp_accept(ctx_net1000, &sockfd);							// TCP server
-	    }
-	    else if (use_backend_net1000 == UDP)
-	    {
-	        ;
-	    }
+    for (;;)
+    {
+		if(comm_mode == MCM_TCP_SERVER)
+		{
+			for(;;)
+			{
+
+			}
+		}
+    	if(comm_mode == MCM_TCP_CLIENT)
+		{
+    		printf("modbus_tcp_accept\n");
+			res = modbus_tcp_accept(ctx_net1000, &sockfd);							// TCP server
     	/*
     	 * 函数modbus_receive,判断指示或回应两模式下不同功能码接受的数据
     	 * 返回正确接受的数据,并且该数据通过CRC校验
@@ -109,61 +126,52 @@ static int net1000ThreadFunc(void *arg)
     	 */
 
 	    for(;;){
-	    	if(res == -1)
-	    		goto disconnect;
+//	    	if(res == -1)
+//	    		goto disconnect;
 			rc_net1000 = modbus_receive(ctx_net1000, query_net1000,11);
 			if (rc_net1000 == -1) {
 				/* Connection closed by the client or error */
-//				break;
-	        	goto disconnect;
+				break;
+//	        	goto disconnect;
+//				continue;
 			}
-
-	/*        if (rc_net1000 == 0) {
-	//        	if(modbus_test_debug(ctx))
-	//        		printf("\nThere is %d times out select\n",num++);
-				a5d3ad_get_ad(mb_mapping->tab_input_registers,
-						UT_INPUT_REGISTERS_ADDRESS, UT_INPUT_REGISTERS_NB);
-				continue;
-			}*/
-	//        printf("122344...\n");
-			/* Read holding registers */
-//			if (query_net1000[header_length] == 0x06)
-//			{
-//				printf("  pppppp \n");
-//			}
-//			if (query_net1000[header_length] == 0x03)
-//			{
-//			   // 如果接受到的指示数组中的第4,5字节对应的读出数量为2,就将数量改为1
-//				if (MODBUS_GET_INT16_FROM_INT8(query_net1000, header_length + 3) == UT_REGISTERS_NB_SPECIAL)
-//				{
-//					printf("Set an incorrect number of values\n");
-//					MODBUS_SET_INT16_TO_INT8(query_net1000, header_length + 3, UT_REGISTERS_NB_SPECIAL - 1);
-//				}
-//				else if (MODBUS_GET_INT16_FROM_INT8(query_net1000, header_length + 1) == UT_REGISTERS_ADDRESS_SPECIAL)
-//				{
-//					printf("Reply to this special register address by an exception\n");
-//					modbus_reply_exception(ctx_net1000, query_net1000, MODBUS_EXCEPTION_SLAVE_OR_SERVER_BUSY);
-//					continue;
-//				}
-//			}
 			net_offset = ctx_net1000->backend->header_length;			// 取出数据头长度默认为1
 		    net_slave = query_net1000[net_offset - 1];
 	        if((net_slave < 1) ||((net_slave > 16) && (net_slave != 128)))
 	        {
 	        	zlog_warn(c, "Modbus TCP device ID = %d, 不在范围内ID = 128|| 1 <= ID <= 16", net_slave);
-	        	goto disconnect;//break;
+	        	continue;
+//	        	goto disconnect;
 	        }
 	        if(net_slave == 128)
 	        	net_slave = 0;
 			rc_net1000 = modbus_reply(ctx_net1000, query_net1000, rc_net1000, (modbus_mapping_t *)mb_mapping[net_slave]);
 			if (rc_net1000 == -1) {
-//				break;
-				goto disconnect;
+				break;
+//				goto disconnect;
 			}
 	    }
-		disconnect:
-		 close(ctx_net1000->s);
-		        sleep(5);
+//		disconnect:
+//			close(ctx_net1000->s);
+//		sleep(5);
+//		 if(comm_mode == MCM_TCP_SERVER)
+//		 {
+//			zlog_info(c, "Net1000正在尝试连接服务器...");
+//			res = tcpClientConnect(ctx_net1000);
+//
+////					sockfd = modbus_tcp_client_socket(ctx_net1000);									// TCP client
+////					res = modbus_tcp_connect(ctx_net1000);											// TCP client
+//			 if(res == -1)
+//			 {
+//				 printf("Net1000无法连接主站");
+//			 }
+//			if (getpeername(ctx_net1000->s, (struct sockaddr *)&ss, &len) < 0)
+//			{
+//				printf("getpeername 错误\n");
+//			}
+//			printf("Step4:连接到： %s\n", Sock_ntop_host( (struct sockaddr *)&ss, len));
+//		 }
+    	}
     }
     pthread_exit(0);
 }
@@ -303,7 +311,10 @@ void net1000Free()
 //	if(mb_mapping !=NULL)
 //		modbus_mapping_free(mb_mapping);
 	if(query_net1000 !=NULL)
+	{
 		free(query_net1000);
+		query_net1000 = NULL;
+	}
 	if(ctx_net1000 != NULL)
 		modbus_free(ctx_net1000);
 }
@@ -321,7 +332,7 @@ int modbus_tcp_connect(modbus_t *ctx)
 	bzero(&server, sizeof(server));
 	server.sin_family = AF_INET;
 	server.sin_port = htons(ctx_tcp->port);
-//	server.sin_port = htons(1502);
+//	server.sin_port = htons(6000);
 	if (inet_pton(AF_INET, ctx_tcp->ip, &server.sin_addr) <= 0) {
 //		  printf("[错误]Net1000调用inet_pton() 错误\n");
 		  zlog_error(c, "Net1000调用inet_pton() 错误");
@@ -367,4 +378,152 @@ int modbus_tcp_client_socket(modbus_t *ctx)
 //    }
 //    ctx->s =
 	return ctx->s;
+}
+
+static int tcpClientConnect(modbus_t *ctx)
+{
+	int	n;
+	int	res_connect;//++++
+	struct sockaddr_in t;
+	struct addrinfo	hints, *res, *ressave;
+	modbus_tcp_t *ctx_tcp = ctx->backend_data;
+	char port[6];
+	bzero(&hints, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	sprintf(port, "%d", ctx_tcp->port);
+	port[5] = '\0';
+	if ( (n = getaddrinfo(ctx_tcp->ip, port, &hints, &res)) != 0)
+	{
+		printf("TCP连接错误：%s, %d: %s", ctx_tcp->ip, ctx_tcp->port, gai_strerror(n));
+		exit(-1);
+	}
+	ressave = res;
+	do
+	{
+	//		printf("Step2.3:socket入口参数为ai_family = %d, ai_socktype = %d, ai_protocol = %d\n", res->ai_family, res->ai_socktype, res->ai_protocol);
+	//		printf("Step2.3:socket入口参数为ai_family = %d, ai_socktype = %d, ai_protocol = %d\n", PF_INET, SOCK_STREAM, IPPROTO_TCP);
+		ctx->s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	//		sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (ctx->s < 0)
+		{
+			printf("Step2.4:创建socket套接字失败！sockfd = %d\n", ctx->s);
+			continue;	/* ignore this one */
+		}
+
+	//		t = (struct sockaddr_in *)&res->ai_addr;
+	//		t = res->ai_addr;
+	//		t.sin_addr.s_addr = inet_addr("192.168.93.128");
+		t.sin_addr.s_addr = inet_addr(ctx_tcp->ip);
+		t.sin_port = htons(ctx_tcp->port);
+//		printf("port = %d\n", htons(t.sin_port));
+		t.sin_family = AF_INET;  //设置地址家族
+//		printf("%s\n",inet_ntoa(t.sin_addr));
+	//		int n = 0;
+	//		for(n = 0; n < 14; n ++)
+	//			printf("%.2X",(unsigned char *)res->ai_addr->sa_data[n]);
+	//		printf("\n");
+	//		if ( (res_connect = connect(sockfd, res->ai_addr, res->ai_addrlen))== 0)
+		if ( (res_connect = connect(ctx->s, (struct sockaddr *)&t, sizeof(struct sockaddr)))== 0)
+		{
+			zlog_info(c, "RTU成功连接服务器%s，服务端口: %d",ctx_tcp->ip, ctx_tcp->port);
+			break;		/* success */
+		}
+		else //++++
+		{
+			zlog_info(c, "RTU未能连接服务器errno = %d\n",res_connect);
+//			printf("Step2.5:connect服务器失败errno = %d\n",res_connect);
+		}
+	//		Close(sockfd);	/* ignore this one */
+
+		if (close(ctx->s) == -1)
+		{
+	//			err_sys("close error");
+			zlog_warn(c, "关闭Net1000sockfd错误:%d", errno);
+			exit(-1);
+		}
+	} while ( (res = res->ai_next) != NULL);
+
+	if (res == NULL)	/* errno set from final connect() */
+	{
+	//		err_sys("tcp_connect error for %s, %s", host, serv);
+		printf("TCP连接错误： %s, %d", ctx_tcp->ip, ctx_tcp->port);
+		exit(-1);
+	}
+
+	freeaddrinfo(ressave);
+
+//	return(ctx->s);
+	return 0;
+}
+char *
+sock_ntop_host(const struct sockaddr *sa, socklen_t salen)
+{
+    static char str[128];		/* Unix domain is largest */
+
+	switch (sa->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in	*sin = (struct sockaddr_in *) sa;
+
+		if (inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)) == NULL)
+			return(NULL);
+		return(str);
+	}
+
+#ifdef	IPV6
+	case AF_INET6: {
+		struct sockaddr_in6	*sin6 = (struct sockaddr_in6 *) sa;
+
+		if (inet_ntop(AF_INET6, &sin6->sin6_addr, str, sizeof(str)) == NULL)
+			return(NULL);
+		return(str);
+	}
+#endif
+
+//#ifdef	AF_UNIX
+//	case AF_UNIX: {
+//		struct sockaddr_un	*unp = (struct sockaddr_un *) sa;
+//
+//			/* OK to have no pathname bound to the socket: happens on
+//			   every connect() unless client calls bind() first. */
+//		if (unp->sun_path[0] == 0)
+//			strcpy(str, "(no pathname bound)");
+//		else
+//			snprintf(str, sizeof(str), "%s", unp->sun_path);
+//		return(str);
+//	}
+//#endif
+//
+//#ifdef	HAVE_SOCKADDR_DL_STRUCT
+//	case AF_LINK: {
+//		struct sockaddr_dl	*sdl = (struct sockaddr_dl *) sa;
+//
+//		if (sdl->sdl_nlen > 0)
+//			snprintf(str, sizeof(str), "%*s",
+//					 sdl->sdl_nlen, &sdl->sdl_data[0]);
+//		else
+//			snprintf(str, sizeof(str), "AF_LINK, index=%d", sdl->sdl_index);
+//		return(str);
+//	}
+//#endif
+	default:
+		snprintf(str, sizeof(str), "sock_ntop_host: unknown AF_xxx: %d, len %d",
+				 sa->sa_family, salen);
+		return(str);
+	}
+    return (NULL);
+}
+
+static char *Sock_ntop_host(const struct sockaddr *sa, socklen_t salen)
+{
+	char	*ptr;
+
+	if ( (ptr = sock_ntop_host(sa, salen)) == NULL)
+	{
+//		err_sys("sock_ntop_host error");	/* inet_ntop() sets errno */
+		printf("sock_ntop_host错误\n");
+		exit(1);
+	}
+	return(ptr);
 }

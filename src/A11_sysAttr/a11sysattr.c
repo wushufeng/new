@@ -76,6 +76,8 @@ E1_sys_attribute* LoadConfigA11(void)
 					if(res != 0)
 						zlog_warn(c, "未能将厂家自定义配置参数写入配置文件");
 				}
+				poilwell[0]->load_displacement.dynagraph.set_dot = \
+						poilwell[0]->fuction_param.custom.dynagraph_dot;
 //				poilwell[0]->fuction_param.custom.oilwell_ID[0] = 0x01;
 //				poilwell[0]->fuction_param.custom.oilwell_ID[1] = 0x02;
 				break;
@@ -214,38 +216,51 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 	// 将内从中的baseinfo参数写入配置文件
 	sprintf(str,"%d",psysattr->baseinfo.password);
 	if (!write_profile_string("rtuBaseInfo","password",str,A11filename)) return -1;
+	if (!write_profile_string("rtuBaseInfo",";口令","()",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->baseinfo.type_version);
 	if (!write_profile_string("rtuBaseInfo","type_version",str,A11filename)) return -1;
+	if (!write_profile_string("rtuBaseInfo",";型号版本","()",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->baseinfo.dev_company);
 	if (!write_profile_string("rtuBaseInfo","dev_company",str,A11filename)) return -1;
+	if (!write_profile_string("rtuBaseInfo",";设备厂家","()",A11filename)) return -1;
 	sprintf(str,"%03d",psysattr->baseinfo.well_station_type);
 	if (!write_profile_string("rtuBaseInfo","well_station_type",str,A11filename)) return -1;
+	if (!write_profile_string("rtuBaseInfo",";应用井站类型","()",A11filename)) return -1;
 	if(getSysLocalDateTime((void *)psysattr) != 0)
 		return -1;
 	// 将内存中的commparam参数写入配置文件
 	sprintf(str,"%d",psysattr->commparam.downlink_resend_num);
 	if (!write_profile_string("commParam","downlink_resend_num",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";下行通信失败重发次数","()",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.downlink_recv_timeout);
 	if (!write_profile_string("commParam","downlink_recv_timeout",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";下行通信接收超时时间","(单位秒)",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.downlink_comm_interface);
 	if (!write_profile_string("commParam","downlink_comm_interface",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";下行通信接口","(FF 无效,01:以太网,02:无线 433(TTL),03: ZigBee (TTL),04: RS232A,05: RS232B,06:RS485A,07:RS485B)",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.master_comm_mode);
 	if (!write_profile_string("commParam","master_comm_mode",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";主站通信方式","(FF 无效,01:GPRS/CDMA,02:Ethernet TCP Server,03:Ethernet TCP Client,04:Ethernet UDP Server,05:Ethernet UDP Client)",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.master_port);
 	if (!write_profile_string("commParam","master_port",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";主站端口号","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",psysattr->commparam.master_ip_address[0],
 			psysattr->commparam.master_ip_address[1],
 			psysattr->commparam.master_ip_address[2],
 			psysattr->commparam.master_ip_address[3]);
 	if (!write_profile_string("commParam","master_ip_address",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";主站 IP 地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d",psysattr->commparam.tcp_port);
 	if (!write_profile_string("commParam","tcp_port",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";本地 TCP 端口号","()",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.upd_port);
 	if (!write_profile_string("commParam","upd_port",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";本地 UDP 端口号","()",A11filename)) return -1;
 	sprintf(str,"%d",psysattr->commparam.tcp_udp_identity);
 	if (!write_profile_string("commParam","tcp_udp_identity",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";TUP/UDP标识","(TCP/IP 地址,MODBUS TCP/IP,目前寄存器支持 IPv4)",A11filename)) return -1;
 
 	sprintf(str,"%02X:%02X:%02X:%02X:%02X:%02X",psysattr->commparam.mac_address[0],
 			psysattr->commparam.mac_address[1],
@@ -254,41 +269,53 @@ int createA11Configfile(E1_sys_attribute * psysattr,const char *filename)
 			psysattr->commparam.mac_address[4],
 			psysattr->commparam.mac_address[5]);
 	if (!write_profile_string("commParam","mac_address",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";MAC地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",psysattr->commparam.gateway[0],
 			psysattr->commparam.gateway[1],
 			psysattr->commparam.gateway[2],
 			psysattr->commparam.gateway[3]);
 	if (!write_profile_string("commParam","gateway",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";网关","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",psysattr->commparam.subnet_mask[0],
 			psysattr->commparam.subnet_mask[1],
 			psysattr->commparam.subnet_mask[2],
 			psysattr->commparam.subnet_mask[3]);
 	if (!write_profile_string("commParam","subnet_mask",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";子网掩码","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",psysattr->commparam.ip_address[0],
 			psysattr->commparam.ip_address[1],
 			psysattr->commparam.ip_address[2],
 			psysattr->commparam.ip_address[3]);
 	if (!write_profile_string("commParam","ip_address",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";本地IP地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d", psysattr->commparam.comm_duplex);
 	if (!write_profile_string("commParam", "comm_duplex",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";半/全双工","(0=半双工,1=全双工)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.comm_paritybit);
 	if (!write_profile_string("commParam", "comm_paritybit",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";奇偶校验","(0=无校验,1=偶校验,2=奇校验)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.comm_stopbit);
 	if (!write_profile_string("commParam", "comm_stopbit",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";停止位","(0=1 位,1=2 位)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.comm_databit);
 	if (!write_profile_string("commParam", "comm_databit",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";数据位","(0=7 位,1=8 位)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.comm_baudrate);
 	if (!write_profile_string("commParam", "comm_baudrate",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";波特率","(0=1200,1=2400,2=4800,3=9600,4=19200,5=38400,6=57600,7=115200)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.terminal_comm_address);
 	if (!write_profile_string("commParam", "terminal_comm_address",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";终端通信地址","(默认为 0)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.communication_protocols);
 	if (!write_profile_string("commParam", "communication_protocols",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";通信协议","(0=MODBUS RTU,1= MODBUS TCP/IP,2= DNP 3.0)",A11filename)) return -1;
 	sprintf(str,"%d", psysattr->commparam.communication_mode);
 	if (!write_profile_string("commParam", "communication_mode",str,A11filename)) return -1;
+	if (!write_profile_string("commParam",";通信方式","(0=数传电台,1=GPRS/CDMA,2=RS485,3=无线网桥,4=MicWill,5=LTE)",A11filename)) return -1;
 	// 将内存中的厂商自定义数据参数写入配置文件
 //	manufacturersParamToFile(&poilwell[0]->fuction_param.custom);
 	return 0;
@@ -514,7 +541,7 @@ static int manufacturersParamInit(manufacturers_of_custom * pobj)
 	pobj->patrol_num = 8;								// RTU巡检总井数 (1～8)
 	pobj->dynagraph_mode = 0x10;						// 功图测试类型 (0：实际功图	0x10：模拟功图)
 	pobj->dynagraph_dot = 200;							// 功图测试点数 (200～250)
-	pobj->elec_switch = 1;									// 电量图测试状态 (0：关闭，1：开启)
+	pobj->elec_switch = 1;								// 电量图测试状态 (0：关闭，1：开启)
 	pobj->offline_savedata_switch = 1;					// 断网存储状态 (0：关闭，1：开启)
 	pobj->A1alram_switch = 0;							// A1报警 (0：关闭，1：开启)
 	pobj->A1alram_upload_cycle = 60;					// A1报警上传周期 (单位 s)
@@ -609,6 +636,7 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 	// IPv6
 	sprintf(str,"%d",pobj->IP_extern.IPv6_master_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_master_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 主站端口号","()",A11filename)) return -1;
 	sprintf(str,"%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",pobj->IP_extern.IPv6_master_ip[0],	\
 				pobj->IP_extern.IPv6_master_ip[1],	\
 				pobj->IP_extern.IPv6_master_ip[2],	\
@@ -618,15 +646,20 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 				pobj->IP_extern.IPv6_master_ip[6],	\
 				pobj->IP_extern.IPv6_master_ip[7]);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_master_ip",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 主站地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->IP_extern.IPv6_tcp_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_tcp_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 本地 TCP 端口","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv6_upd_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_upd_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 本地 UDP 端口","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv6_access);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_access",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 IP 获取方式","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv6_tcp_udp_identity);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_tcp_udp_identity",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 TCP/UDP 标识","()",A11filename)) return -1;
 
 	sprintf(str,"%d:%d:%d:%d:%d:%d:%d:%d",pobj->IP_extern.IPv6_gateway[0],	\
 				pobj->IP_extern.IPv6_gateway[1],	\
@@ -637,9 +670,11 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 				pobj->IP_extern.IPv6_gateway[6],	\
 				pobj->IP_extern.IPv6_gateway[7]);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_gateway",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 网关","()",A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->IP_extern.IPv6_prefix_len);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_prefix_len",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv6 子网长度","()",A11filename)) return -1;
 
 	sprintf(str,"%04X:%04X:%04X:%04X:%04X:%04X:%04X:%04X",pobj->IP_extern.IPv6_ip[0],	\
 				pobj->IP_extern.IPv6_ip[1],	\
@@ -650,46 +685,57 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 				pobj->IP_extern.IPv6_ip[6],	\
 				pobj->IP_extern.IPv6_ip[7]);
 	if (!write_profile_string("manufacturers_of_custom","IPv6_ip",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";本地 IPv6 地址","()",A11filename)) return -1;
 
 	// IPv4
 	sprintf(str,"%d",pobj->IP_extern.IPv4_master_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_master_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 主站端口号","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_master_ip[0],	\
 			pobj->IP_extern.IPv4_master_ip[1],	\
 			pobj->IP_extern.IPv4_master_ip[2],	\
 			pobj->IP_extern.IPv4_master_ip[3]);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_master_ip",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 主站 IP 地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->IP_extern.IPv4_tcp_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_tcp_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 本地 TCP 端口","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv4_upd_port);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_upd_port",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 本地 UDP 端口","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv4_access);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_access",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 IP 获取方式","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->IP_extern.IPv4_tcp_udp_identity);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_tcp_udp_identity",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 TCP/UDP 标识","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_gateway[0],
 			pobj->IP_extern.IPv4_gateway[1],
 			pobj->IP_extern.IPv4_gateway[2],
 			pobj->IP_extern.IPv4_gateway[3]);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_gateway",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IPv4 网关","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_subnet_mask[0],
 			pobj->IP_extern.IPv4_subnet_mask[1],
 			pobj->IP_extern.IPv4_subnet_mask[2],
 			pobj->IP_extern.IPv4_subnet_mask[3]);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_subnet_mask",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";IIPv4 子网掩码","()",A11filename)) return -1;
 
 	sprintf(str,"%d.%d.%d.%d",pobj->IP_extern.IPv4_ip[0],	\
 			pobj->IP_extern.IPv4_ip[1],	\
 			pobj->IP_extern.IPv4_ip[2],	\
 			pobj->IP_extern.IPv4_ip[3]);
 	if (!write_profile_string("manufacturers_of_custom","IPv4_ip",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";本地 IPv4 地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->IP_extern.comm_duplex);
 	if (!write_profile_string("manufacturers_of_custom","comm_duplex",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";半/全双工","(0-半双工,1=全双工)",A11filename)) return -1;
 
 	sprintf(str,"%02X:%02X:%02X:%02X:%02X:%02X",pobj->IP_extern.mac[0], \
 			pobj->IP_extern.mac[1],	\
@@ -698,55 +744,80 @@ static int manufacturersParamToFile(manufacturers_of_custom * pobj)
 			pobj->IP_extern.mac[4],	\
 			pobj->IP_extern.mac[5]);
 	if (!write_profile_string("manufacturers_of_custom","mac_address",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";MAC 地址","()",A11filename)) return -1;
 
 	sprintf(str,"%d",pobj->switch_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","switch_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";开关量巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->analog_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","analog_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";模拟量巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->rpm_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","rpm_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";扭矩转速巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->liquid_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","liquid_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";液面巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->touque_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","touque_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";扭矩巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->load_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","load_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";载荷巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->angledisplacement_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","angledisplacement_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";角位移巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->elec_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","elec_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";电参巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->tempreture_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","tempreture_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";温度巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->press_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","press_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";压力巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->dynagraph_patroltime);
 	if (!write_profile_string("manufacturers_of_custom","dynagraph_patroltime",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";功图巡检时间","(单位 s,0:关闭有线巡检)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->update_packet_size);
 	if (!write_profile_string("manufacturers_of_custom","update_packet_size",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";更新单元单包发送字节数","(必须是 32 的整数倍)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->A1alram_upload_cycle);
 	if (!write_profile_string("manufacturers_of_custom","A1alram_upload_cycle",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";A1报警上传周期","(单位秒)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->A1alram_switch);
 	if (!write_profile_string("manufacturers_of_custom","A1alram_switch",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";A1 报警","(0:关闭,1:开启)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->offline_savedata_switch);
 	if (!write_profile_string("manufacturers_of_custom","offline_savedata_switch",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";断网存储状态","(0:关闭,1:开启)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->elec_switch);
 	if (!write_profile_string("manufacturers_of_custom","elec_sta",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";电量图测试状态","(0:关闭,1:开启)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->dynagraph_dot);
 	if (!write_profile_string("manufacturers_of_custom","dynagraph_dot",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";功图测试点数","(200~250)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->dynagraph_mode);
 	if (!write_profile_string("manufacturers_of_custom","dynagraph_mode",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";功图测试类型","(0:实际功图,0x10:模拟功图)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->patrol_num);
 	if (!write_profile_string("manufacturers_of_custom","patrol_num",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";RTU 巡检总井数","()",A11filename)) return -1;
 	sprintf(str,"%d",pobj->heartbeat_interval);
 	if (!write_profile_string("manufacturers_of_custom","heartbeat_interval",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";有应答心跳间隔","(单位秒)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->non_heartbeat_interval);
 	if (!write_profile_string("manufacturers_of_custom","non_heartbeat_interval",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";无应答心跳间隔","(单位秒)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->heartbeat_sta);
 	if (!write_profile_string("manufacturers_of_custom","heartbeat_sta",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";心跳状态","(0:关闭,1:开启)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->data_transfer_mode);
 	if (!write_profile_string("manufacturers_of_custom","data_transfer_mode",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";数据传输模式","(0:透传模式,1:网络识别模式)",A11filename)) return -1;
 	sprintf(str,"%d",pobj->communication_protocols);
 	if (!write_profile_string("manufacturers_of_custom","communication_protocols",str,A11filename)) return -1;
+	if (!write_profile_string("manufacturers_of_custom",";RTU与上位机协议类型","(0=MODBUS RTU,1= MODBUS TCP/IP,2= DNP 3.0,4= 大庆GRM)",A11filename)) return -1;
 	return 0;
 }
 /*

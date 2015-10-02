@@ -14,6 +14,7 @@
 #include	"ManagerDB.h"
 #include	"../database/database.h"
 #include "../log/rtulog.h"
+
 //#include	"../database/database.h"
 //void outputItem(sqlite3_stmt* stat, int nColumn, char* out_pic_path);
 const char *dbfile = "./DataBase/RTU.db";
@@ -81,7 +82,8 @@ int openDatabase(const char *dbfile, sqlite3 *db)
 			NULL);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]无法打开数据库，错误号[%d]: %s\n", res, sqlite3_errmsg(db));
+		zlog_warn(c, "无法打开数据库，错误号[%d]: %s", res, sqlite3_errmsg(db));
+//		printf("[错误]无法打开数据库，错误号[%d]: %s\n", res, sqlite3_errmsg(db));
 	}
 	return res;
 }
@@ -97,7 +99,8 @@ int closeDatabase(sqlite3 *db)
 	res = sqlite3_close(db);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]无法关闭数据库，错误号[%d]: %s\n", res, sqlite3_errmsg(db));
+		zlog_warn(c, "无法关闭数据库，错误号[%d]: %s", res, sqlite3_errmsg(db));
+//		printf("[错误]无法关闭数据库，错误号[%d]: %s\n", res, sqlite3_errmsg(db));
 	}
 	return res;
 }
@@ -117,7 +120,8 @@ int createSqlTable(void)
 	res = sqlite3_open_v2(dbfile, &pdb, SQLITE_OPEN_READWRITE |SQLITE_OPEN_CREATE, NULL);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_open_v2失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
+//		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	res = sqlite3_exec( pdb, SQLCode, 0, 0, &errmsg );
@@ -126,7 +130,8 @@ int createSqlTable(void)
 //		char * tempinfo = NULL;
 //		sprintf(tempinfo,"[错误]创建数据表失败：%d-%s \n", res, errmsg);
 //		zlog_info(c, tempinfo);
-		printf("[错误]创建数据表失败：%d-%s \n", res, errmsg);
+		zlog_warn(c, "创建数据表失败：%d-%s", res, errmsg);
+//		printf("[错误]创建数据表失败：%d-%s \n", res, errmsg);
 		sqlite3_free(errmsg);								// 释放内部分配的空间
 		sqlite3_close(pdb);							// 来用关闭打开的数据库
 		return 1;
@@ -152,7 +157,8 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 	res = sqlite3_open_v2(dbfile, &pdb, SQLITE_OPEN_READWRITE |SQLITE_OPEN_CREATE, NULL);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_open_v2失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
+//		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	// 准备待插入得数据
@@ -192,7 +198,8 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
     if (res != SQLITE_OK)
 	{
 		sqlite3_close(pdb);
-		fprintf(stderr, "[错误]sqlite3_get_table失败,错误号=%d:%s\n",res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_get_table失败,错误号=%d:%s",res, sqlite3_errmsg(pdb));
+//		fprintf(stderr, "[错误]sqlite3_get_table失败,错误号=%d:%s\n",res, sqlite3_errmsg(pdb));
 		sqlite3_free(errmsg);
 		return 1;
 	}
@@ -217,7 +224,8 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 //			char * tempinfo = NULL;
 //			sprintf(tempinfo,"[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 //			zlog_info(c, tempinfo);
-			fprintf(stderr, "[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+			zlog_warn(c, "sqlite_exec失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
+//			fprintf(stderr, "[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 		}
 		// 将功图数据字段更新最后一条数据
 		bzero(tbuf, 2000);
@@ -233,7 +241,7 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 //			char * tempinfo = NULL;
 //			sprintf(tempinfo,"[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 //			zlog_info(c, tempinfo);
-			fprintf(stderr, "[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+			zlog_warn(c, "sqlite_exec失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
 		}
 	}
 	// 将电流图更新到最后一条数据
@@ -252,7 +260,7 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 //			char * tempinfo = NULL;
 //			sprintf(tempinfo,"[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 //			zlog_info(c, tempinfo);
-			fprintf(stderr, "[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+			zlog_warn(c, "sqlite_exec失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
 		}
 		// 将功率更新到最后一条数据
 		bzero(tbuf, 2000);
@@ -268,7 +276,7 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 //			char * tempinfo = NULL;
 //			sprintf(tempinfo,"[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 //			zlog_info(c, tempinfo);
-			fprintf(stderr, "[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+			zlog_warn(c, "sqlite_exec失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
 		}
 	}
 	// 释放动态内存
@@ -278,7 +286,7 @@ int databaseInsert(void *obj, int group, time_t dgtime, int dgflag, int elecflag
 	res = sqlite3_close(pdb);
 	if(res)
 	{
-		printf("[错误]sqlite3_close失败，错误号=[%d]:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_close失败，错误号=[%d]:%s", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	return 0;
@@ -297,7 +305,7 @@ int showRecordsByTime(time_t time)
 	res = sqlite3_open_v2(dbfile, &pdb, SQLITE_OPEN_READWRITE |SQLITE_OPEN_CREATE, NULL);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_open_v2失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	// 转换时间为字符串
@@ -337,7 +345,7 @@ int showRecordsByTime(time_t time)
 	res = sqlite3_close(pdb);
 	if(res)
 	{
-		printf("[错误]sqlite3_close失败，错误号=[%d]:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_close失败，错误号=[%d]:%s", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	return 0;
@@ -366,7 +374,7 @@ int testCreateTables(void)
 	res = sqlite3_open_v2(dbfile, &pdb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
 	if(res != SQLITE_OK)
 	{
-		printf("[错误]sqlite3_open_v2失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "sqlite3_open_v2失败,错误号=%d:%s", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	// 创建表
@@ -378,14 +386,14 @@ int testCreateTables(void)
 //		char * tempinfo = NULL;
 //		sprintf(tempinfo,"[错误]sqlite_exec失败,错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
 //		zlog_info(c, tempinfo);
-		printf("[错误]创建数据表失败，错误号=%d:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "创建数据表失败，错误号=%d:%s", res, sqlite3_errmsg(pdb));
 //		return res;
 	}
 	// 关闭数据库
 	res = sqlite3_close(pdb);
 	if(res)
 	{
-		printf("[错误]无法关闭数据库，错误号=[%d]:%s\n", res, sqlite3_errmsg(pdb));
+		zlog_warn(c, "无法关闭数据库，错误号=[%d]:%s", res, sqlite3_errmsg(pdb));
 		return res;
 	}
 	return 0;

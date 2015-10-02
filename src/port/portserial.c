@@ -15,11 +15,19 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include "portserial.h"
 
 #include "../log/rtulog.h"
+#include "../myMB/myMB.h"
 
+static int _mb_select(comm_t *ctx, fd_set *rfds, struct timeval *tv, int length_to_read);
+int mb_flush(comm_t *ctx);
+static int _sleep_and_flush(comm_t *ctx);
+static ssize_t mb_recv(comm_t *ctx, uint8_t *rsp, int rsp_length);
+static uint8_t compute_meta_length_after_function(int function, int msg_type);
+static int compute_data_length_after_meta(comm_t *ctx, uint8_t *msg, int msg_type);
 
 // new一个comm_t结构体
 comm_t* new_comm_t(const char *device,
@@ -107,89 +115,6 @@ void init_comm_t(comm_t *ctx)
 /* Sets up a serial port for GPRS communications */
 int comm_connect(comm_t *ctx)
 {
-//	int bStatus = 0;
-//	comm_opt *ctx_opt = ctx->backend_data;
-//	struct termios xNewTIO;
-//	speed_t xNewSpeed;
-//
-//	if((ctx->s = open(ctx_opt->device, O_RDWR | O_NOCTTY)) < 0)
-//		zlog_error(c, "Can't open serial port %s: %s",ctx_opt->device, strerror(errno));
-//	else if (tcgetattr(ctx->s, &ctx_opt->old_tios) != 0)
-//		zlog_error(c, "Can't get settings from port %s: %s", ctx_opt->device, strerror(errno));
-//	else
-//	{
-//		bzero(&xNewTIO, sizeof(struct termios));
-//
-//        switch ( ctx_opt->parity )
-//        {
-//        case 'N':
-//        	xNewTIO.c_cflag &=~ PARENB;
-//            break;
-//        case 'E':
-//            xNewTIO.c_cflag |= PARENB;
-//            break;
-//        case 'O':
-//            xNewTIO.c_cflag |= PARENB | PARODD;
-//            break;
-//        default:
-//            bStatus = 1;
-//        }
-//        switch ( ctx_opt->data_bit )
-//        {
-//        case 8:
-//            xNewTIO.c_cflag |= CS8;
-//            break;
-//        case 7:
-//            xNewTIO.c_cflag |= CS7;
-//            break;
-//        default:
-//            bStatus = 1;
-//        }
-//        switch ( ctx_opt->baud )
-//        {
-//        case 9600:
-//            xNewSpeed = B9600;
-//            break;
-//        case 19200:
-//            xNewSpeed = B19200;
-//            break;
-//        case 38400:
-//            xNewSpeed = B38400;
-//            break;
-//        case 57600:
-//            xNewSpeed = B57600;
-//            break;
-//        case 115200:
-//            xNewSpeed = B115200;
-//            break;
-//        default:
-//            bStatus = 1;
-//        }
-//        if( bStatus )
-//        {
-//            if( cfsetispeed( &xNewTIO, xNewSpeed ) != 0 )
-//            {
-//            	zlog_error(c, "Can't set baud rate %d for port %s: %s\n",
-//            			ctx_opt->baud, ctx_opt->device, strerror( errno ) );
-//            }
-//            else if( cfsetospeed( &xNewTIO, xNewSpeed ) != 0 )
-//            {
-//            	zlog_error(c, "Can't set baud rate %d for port %s: %s\n",
-//                		ctx_opt->baud, ctx_opt->device, strerror( errno ) );
-//            }
-//            else if( tcsetattr( ctx->s, TCSANOW, &xNewTIO ) != 0 )
-//            {
-//            	zlog_error(c, "Can't set settings for port %s: %s\n",
-//            			ctx_opt->device, strerror( errno ) );
-//            }
-//            else
-//            {
-//
-//                bStatus = 0;
-//            }
-//        }
-//	}
-
 
     struct termios tios;
     speed_t speed;
@@ -201,7 +126,7 @@ int comm_connect(comm_t *ctx)
 //        printf("Opening %s at %d bauds (%c, %d, %d)\n",
 //        		ctx_gprs->device, ctx_gprs->baud, ctx_gprs->parity,
 //				ctx_gprs->data_bit, ctx_gprs->stop_bit);
-        zlog_debug(c, "打开串口 %s 工作在 %d 波特率 (%c, %d, %d)",
+        zlog_info(c, "打开串口 %s 工作在 %d 波特率 (%c, %d, %d)",
         		ctx_opt->device, ctx_opt->baud, ctx_opt->parity,
 				ctx_opt->data_bit, ctx_opt->stop_bit);
     }
@@ -466,19 +391,22 @@ void comm_close(comm_t *ctx)
     if (ctx == NULL)
         return;
 	/* Closes the file descriptor in RTU mode */
-    comm_opt *ctx_gprs = ctx->backend_data;
-
-	tcsetattr(ctx->s, TCSANOW, &(ctx_gprs->old_tios));
+    comm_opt *ctx_opt = ctx->backend_data;
+    zlog_info(c, "正在关闭串口:%s", ctx_opt->device);
+	tcsetattr(ctx->s, TCSANOW, &(ctx_opt->old_tios));
 	close(ctx->s);
+//	printf(%d:%s\n",  errno, strerror(errno));
 }
 
 void comm_free(comm_t *ctx)
 {
     if (ctx == NULL)
         return;
-
+    //FIXME 此处free错误,为解决
     free(ctx->backend_data);
+    ctx->backend_data = NULL;
     free(ctx);
+    ctx = NULL;
 }
 
 void comm_set_debug(comm_t *ctx, int boolean)
@@ -519,227 +447,392 @@ inline int serialSend(comm_t *ctx, char *fmt,...)
 	return res;
 }
 
-inline int comm_send(comm_t *ctx, char *req, int req_length)
+inline int comm_send(comm_t *ctx, unsigned char *req, int req_length)
 {
-	int ret;
-//	tcflush(ctx->s,TCOFLUSH);
-	ret = write(ctx->s,req,req_length);
-	if (req_length == ret ){
-//		tcflush(ctx->s, TCIFLUSH);	// 清串口输入缓存
-		return ret;
-	} else {
-		tcflush(ctx->s,TCOFLUSH);
-		return -1;
-	}
-}
-
-inline int comm_read(comm_t *ctx, char *rsp, int rsp_len, int timeout)
-{
-    unsigned char   bResult = 0;
-    ssize_t         res;
-    fd_set          rfds;
-    struct timeval  tv;
-    int bytesread;
-
-    tv.tv_sec = timeout;
-    tv.tv_usec = 0;
-    FD_ZERO( &rfds );
-    FD_SET( ctx->s, &rfds );
-
-    /* Wait until character received or timeout. Recover in case of an
-     * interrupted read system call. */
-    do
-    {
-//        while ((res = select(ctx->s+1, &rfds, NULL, NULL, &tv)) == -1) 	// 如果tv = NULL为阻塞：select将一直被阻塞
-//        {
-//            if (errno == EINTR)
-//            {																		// EINTR:read 由于信号中断,没读到任何数据
-//                FD_ZERO( &rfds );
-//                FD_SET( ctx->s, &rfds );
-//            }
-//            else
-//            {
-//                break;
-//            }
-//        }
-    	res = select( ctx->s + 1, &rfds, NULL, NULL, &tv );
-    	if( res == -1 )
-        {
-            if( errno != EINTR )		// Interrupted system call
-            {
-                bResult = -1;
-                bytesread = -1;
-                zlog_error(c, "GPRS端口中select错误:%d", errno);
-            }
-        }
-    	if(res == 0)
-    	{
-    		printf("select time out\n");
-//    		tv.tv_sec = timeout;
-            bResult = -1;
-            bytesread = 0;
-    	}
-        else if( FD_ISSET( ctx->s, &rfds ) )
-        {
-            if( ( res = read( ctx->s, rsp, rsp_len ) ) == -1 )
-            {
-                bResult = -1;
-                bytesread = -1;
-            }
-            else
-            {
-                bytesread = ( int ) res;
-                break;
-            }
-        }
-        else
-        {
-        	bytesread = 0;
-            break;
-        }
+	int rc;
+	int i;
+    if (ctx->debug) {
+        for (i = 0; i < req_length; i++)
+            printf("[%.2X]", req[i]);
+        printf("\n");
     }
-	while( bResult == 0 );
-	return bytesread;
-//	fd_set fds;
-//	FD_ZERO(&fds);
-//	FD_SET(ctx->s, &fds);
-//	struct timeval tv = {0, 1000*timeout};
-//	int total = rsp_len;
-//	jsq=0;
-//	char* startRev = rsp;
-//	while(total > 0)
-//	{
-//		int res = select(ctx->s+1, &fds, NULL, NULL, &tv);
-//		tv.tv_usec = 1000*timeout;
-//		if(res == -1)
-//		{
-//			if(errno == EINTR)		/* Interrupted system call */
-//			continue;
-//			else
-//			{
-//			printf("socket error %d with select", errno);
-//			return -1;
-//		  }
-//	}
-//	else if(res == 0)
-//	{
-//	   jsq=rsp_len - total;
-//	   if(jsq>1024)
-//	   {  jsq=0;}
-//	   rsp[jsq] = '\0';
-//	//	   memcpy(buff1,rsp,jsq); // copy param
-//	   printf("res = 0, 读串口: %s\n", rsp);
-//	  return rsp_len - total;
-//	}
-//
-//	if(FD_ISSET(ctx->s, &fds))
-//	{
-//	  int rs = read(ctx->s, startRev, rsp_len);
-//	  if(rs < 0)
-//	  {
-//		rsp[rsp_len - total] = '\0';
-//	//		perror("readComm:");
-//		printf("res = 1, 读串口: %s\n", rsp);
+    /* In recovery mode, the write command will be issued until to be
+       successful! Disabled by default. */
+    do {
+        rc = write(ctx->s, req, req_length);
+        if (rc == -1) {
+            zlog_warn(c, "write错误-%d:%s", errno, strerror(errno));
+            if (ctx->error_recovery & MB_ERROR_RECOVERY_LINK) {
+                int saved_errno = errno;
+
+                if ((errno == EBADF || errno == ECONNRESET || errno == EPIPE)) {
+                    comm_close(ctx);
+                    comm_connect(ctx);
+                } else {
+                	_sleep_and_flush(ctx);
+                }
+                errno = saved_errno;
+            }
+        }
+    } while ((ctx->error_recovery & MB_ERROR_RECOVERY_LINK) && rc == -1);
+
+    if (rc > 0 && rc != req_length) {
+//        errno = EMBBADDATA;
+        return -1;
+    }
+    else
+    	return rc;
+//	int ret;
+////	tcflush(ctx->s,TCOFLUSH);
+//	ret = write(ctx->s,req,req_length);
+//	if (req_length == ret ){
+////		tcflush(ctx->s, TCIFLUSH);	// 清串口输入缓存
+//		return ret;
+//	} else {
+//		tcflush(ctx->s,TCOFLUSH);
 //		return -1;
-//	  }
-//	  total -= rs;
-//	  startRev += rs;
 //	}
-//	}
-//	return rsp_len - total;
-
-//	fd_set fds;
-//	FD_ZERO(&fds);
-//	FD_SET(ctx->s, &fds);
-//	struct timeval tv;
-//	int read_len;
-////	int total = rsp_len;
-//	jsq=0;
-////	char* startRev = rsp;
-//
-//	tv.tv_sec = 0;
-//	tv.tv_usec = timeout * 1000;
-////	while(total > 0)
-////	{
-//		int res = select(ctx->s+1, &fds, NULL, NULL, &tv);
-//		if(res == -1)
-//		{
-////		  if(errno == EINTR)			// 系统中断
-////			continue;
-////		  else
-////		  {
-//			zlog_error(c, "select错误 %d", errno);
-//			return -1;
-////		  }
-//		}
-//		else if(res == 0)
-//		{
-//		   jsq=rsp_len - total;
-//		   if(jsq>1024)
-//		   {  jsq=0;}
-//		   rsp[jsq] = '\0';
-//		   memcpy(gprs_req_data,rsp,jsq); // copy param
-//		   printf("readComm: %s\n", rsp);
-//		  return rsp_len - total;
-//		}
-//
-//		if(FD_ISSET(ctx->s, &fds))			// 判断描述符fd是否在给定的描述符集fdset中
-//		{
-//			read_len = read(ctx->s, rsp, rsp_len);
-//			if(read_len < 0)
-//			{
-//				rsp[0] = '\0';
-//			}
-//
-//		}
-////	}
-//	return read_len;
 }
-//inline int comm_read(comm_t *ctx, char *rsp, int rsp_len, int timeout)
-int SerialRead(comm_t *ctx, char * pucBuffer, unsigned short int usNBytes, unsigned short int *usNBytesRead, int tm_ms )
-{
-    int            bResult = 0;
-    size_t         res;
-    fd_set          rfds;
-    struct timeval  tv;
-    tm_ms *= 10;
-    tv.tv_sec = tm_ms / 1000;
-    tv.tv_usec = (tm_ms % 1000) * 1000;
-    FD_ZERO( &rfds );
-    FD_SET( ctx->s, &rfds );
 
-    /* Wait until character received or timeout. Recover in case of an
-     * interrupted read system call. */
+inline int comm_read(comm_t *ctx, unsigned char *rev, int rev_len, int tm_ms)
+{
+    int rc;
+    fd_set rfds;									// 申请一组文件描述符集合
+    struct timeval tv;						// 延时时间结构体
+    struct timeval *p_tv;				// 延时时间结构体指针,用于指向此类结构体
+//    int length_to_read;
+//    int msg_length = 0;					// 此变量中保存已经读入数组msg中的字节个数
+
+    if(tm_ms > 0)	{
+    	tm_ms *= 10;
+		tv.tv_sec = tm_ms / 1000;
+		tv.tv_usec = (tm_ms % 1000) * 1000;
+		p_tv = &tv;
+    }
+    else
+    	p_tv = NULL;
+
+    if(ctx->debug) {
+    	printf(">[提示]串口等待一个命令...\n");
+    }
+    /* Add a file descriptor to the set */
+    FD_ZERO(&rfds);						// 将新建的指定文件描述符集清空
+    FD_SET(ctx->s, &rfds);				// 将你感兴趣的文件描述符加入该集合,这里的ctx->s对应串口的文件描述符,对于tcp是套接字
+
     do
     {
-        if( select( ctx->s + 1, &rfds, NULL, NULL, &tv ) == -1 )
-        {
-            if( errno != EINTR )
-            {
-                bResult = 1;
+        while ((rc = select(ctx->s+1, &rfds, NULL, NULL, p_tv)) == -1) {		// 如果tv = NULL为阻塞：select将一直被阻塞
+            if (errno == EINTR) {																		// EINTR:read 由于信号中断,没读到任何数据
+//                if (ctx->debug) {																			//如果为debug模式即输出调试信息
+                	zlog_warn(c, "select()一个非阻塞信号被捕获");
+//                }
+                /* Necessary after an error */
+                FD_ZERO(&rfds);												// 如过出现error应重新将文件描述符集合清零
+                FD_SET(ctx->s, &rfds);										// 再把要查询的文件描述符加入集合
+            } else {
+            	// FIXME可添加对于errno为ETIMEDOUT或EBADF的处理
+            	zlog_error(c, "select错误:%d-%s", errno, strerror(errno));
+            	// 判断是否需要从错误恢复连接
+                if (ctx->error_recovery & MB_ERROR_RECOVERY_LINK) {
+                    int saved_errno = errno;
+
+                    if (errno == ETIMEDOUT) {
+                        _sleep_and_flush(ctx);
+                    } else if (errno == EBADF) {				//EBADF文件描述符无效错误
+                    	comm_close(ctx);
+                    	comm_connect(ctx);
+                    }
+                    errno = saved_errno;
+                }
+                return -1;
             }
         }
-        else if( FD_ISSET( ctx->s, &rfds ) )
+        if (rc == 0)	//select超时并返回
         {
-            if( ( res = read( ctx->s, pucBuffer, usNBytes ) ) == -1 )
-            {
-            	// FIXME 读串口错误室,是否关闭文件描述符
-//            	comm_close(ctx->s);
-            	bResult = 1;
-            }
-            else
-            {
-                *usNBytesRead = res;
-                break;
-            }
+//        	printf("%d\n",errno);
+        	return 0;
         }
-        else
+        if( FD_ISSET( ctx->s, &rfds ) )			// 判断是否是ctx->s可读
         {
-            *usNBytesRead = 0;
-            break;
+			if((rc = read(ctx->s, rev, rev_len)) == -1 )
+			{
+				zlog_error(c, "read错误:%d-%s", errno, strerror(errno));
+				// 判断是否需要从错误恢复连接
+	            if ((ctx->error_recovery & MB_ERROR_RECOVERY_LINK) &&
+	                (errno == ECONNRESET || errno == ECONNREFUSED ||
+	                 errno == EBADF)) {
+	                int saved_errno = errno;
+	                comm_close(ctx);
+	                comm_connect(ctx);
+	                /* Could be removed by previous calls */
+	                errno = saved_errno;
+	            }
+				return -1;
+			}
+			else
+				return rc;
         }
-    }
-    while( bResult == 0 );
-    return bResult;
+    }while(1);
+//	return rc;
 }
 
+int mbRead(comm_t *ctx, unsigned char *msg, int msg_type, int length_to_read)
+/*
+ * 指针msg用于保存接收到的数据首地址
+ */
+{
+    int rc = 0;
+    fd_set rfds;									// 申请一组文件描述符集合
+    struct timeval tv;						// 延时时间结构体
+    struct timeval *p_tv;				// 延时时间结构体指针,用于指向此类结构体
+    int msg_length = 0;					// 此变量中保存已经读入数组msg中的字节个数
+    int step;
+    comm_opt *opt = (comm_opt *)ctx->backend_data;
+
+    if (ctx->debug) {						// 如果是debug模式显示当前状态
+        if (msg_type == 0) {
+            printf(">[提示]串口%s等待一个命令...\n", opt->device);
+        } else {
+            printf(">[提示]串口%s等待一个确认...\n", opt->device);
+        }
+    }
+    /* Add a file descriptor to the set */
+    FD_ZERO(&rfds);						// 将新建的指定文件描述符集清空
+    FD_SET(ctx->s, &rfds);				// 将你感兴趣的文件描述符加入该集合,这里的ctx->s对应串口的文件描述符,对于tcp是套接字
+
+    /* We need to analyse the message step by step.  At the first step, we want
+     * to reach the function code because all packets contain this
+     * information. */
+    step = 1;
+
+    if (msg_type == 0) {
+        /* Wait for a message, we don't know when the message will be
+         * received */
+    	/*
+    	 * 等待message,即作为从机等待主机的指示,这里不需要等待时间所以将时间指针p_tv = NULL
+    	 * p_tv = NULL,是告诉select程序将一直阻塞某个文件描述符改变,这里指串口有数据可读
+    	 */
+        p_tv = NULL;
+
+    } else {
+    	/*
+    	 * 如果是确认模式时将response回应时间付给tv这个时间变量结构体
+    	 * 即在规定的时间内未接收到回应的数据
+    	 */
+        tv.tv_sec = ctx->response_timeout.tv_sec;
+        tv.tv_usec = ctx->response_timeout.tv_usec;
+        p_tv = &tv;
+    }
+
+    while (length_to_read != 0) {
+        rc = _mb_select(ctx, &rfds, p_tv, length_to_read);
+        if (rc == -1) {
+//            _error_print(ctx, "select");
+            zlog_warn(c, "select错误:%d", errno);
+            if (ctx->error_recovery & MB_ERROR_RECOVERY_LINK) {
+                int saved_errno = errno;
+
+                if (errno == ETIMEDOUT) {
+                    _sleep_and_flush(ctx);
+                } else if (errno == EBADF) {				//EBADF文件描述符无效错误
+                    comm_close(ctx);
+                    comm_connect(ctx);
+                }
+                errno = saved_errno;
+            }
+            return -1;
+        }
+        rc = mb_recv(ctx, msg + msg_length, length_to_read);
+// 20121002 注销此处,否则老师出现104错误(导致次原因是由于select阻塞不住,虽然时间为NULL,select总是返回)
+//        if (rc == 0) {
+//            errno = ECONNRESET;			// 如果错误为EINTR说明读是由中断引起 的, 如果是ECONNREST表示网络连接出了问题
+//            rc = -1;
+//        }
+        if (rc == -1) {
+            //            _error_print(ctx, "read");
+            zlog_warn(c, "read错误:%d-%s", errno, strerror(errno));
+            if ((ctx->error_recovery & MB_ERROR_RECOVERY_LINK) &&
+                (errno == ECONNRESET || errno == ECONNREFUSED ||
+                 errno == EBADF)) {
+                int saved_errno = errno;
+                comm_close(ctx);
+                comm_connect(ctx);
+                /* Could be removed by previous calls */
+                errno = saved_errno;
+            }
+
+            return -1;
+        }
+        /* Sums bytes received */
+        msg_length += rc;					// msg_length 初始值为0,如果成功接收到了2个字节,即rc = 2 ,就加上rc
+        /* Computes remaining bytes */
+        length_to_read -= rc;			// 将已经读出数据从length_to_read中减去
+
+        if (length_to_read == 0) {		//length_to_read为0表示成功读出ID和功能码这两个字节
+			if(step == 1)
+			{
+				length_to_read = msg[1] * 256 + msg[2];
+				if (length_to_read != 0) {												// 通过功能码的判定得到length_to_read的值,若非零进入meta元模式
+					step = 2;													// 继续通过select函数判定文件描述符是否可读
+				}
+				else
+				{
+					length_to_read = 1;
+	                if ((msg_length + length_to_read) > 256) {
+	//                    errno = EMBBADDATA;
+	//                    _error_print(ctx, "too many data");
+	                    zlog_warn(c, "数据长度超过256");
+	                    return -1;
+	                }
+	                step = 3;
+				}
+
+			}
+			else if(step == 2)
+			{
+				length_to_read = 1;
+                if ((msg_length + length_to_read) > 256) {
+//                    errno = EMBBADDATA;
+//                    _error_print(ctx, "too many data");
+                    zlog_warn(c, "数据长度超过256");
+                    return -1;
+                }
+                step = 3;
+			}
+        }
+
+        if (length_to_read > 0 && ctx->byte_timeout.tv_sec != -1) {
+            /* If there is no character in the buffer, the allowed timeout
+               interval between two consecutive bytes is defined by
+               byte_timeout */
+        	/*
+        	 * 完成第一次select后,说明接受到了数据,这是要把select的时间参数tv改为接受每个字节间所需最大时间
+        	 * 即为modbus中的分包时间,3.5个字节长
+        	 */
+            tv.tv_sec = ctx->byte_timeout.tv_sec;
+            tv.tv_usec = ctx->byte_timeout.tv_usec;
+            p_tv = &tv;
+        }
+    }
+    return msg_length;
+}
+static int _mb_select(comm_t *ctx, fd_set *rfds, struct timeval *tv, int length_to_read)
+{
+	int s_rc;
+	while ((s_rc = select(ctx->s+1, rfds, NULL, NULL, tv)) == -1)
+	{
+		if (errno == EINTR)
+		{
+			if (ctx->debug)
+			{
+				zlog_warn(c, "一个系统终端被捕获");
+			}
+			/* Necessary after an error */
+			FD_ZERO(rfds);
+			FD_SET(ctx->s, rfds);
+		} else {
+			return -1;
+		}
+	}
+//    if (s_rc == 0)
+//    {															//select返回值为0,即为超时
+//        /* Timeout */
+//        errno = ETIMEDOUT;
+//        return -1;
+//    }
+	return s_rc;															//最后返回s_rc值,如果为非0或-1即检测到有数据可读
+}
+static int _sleep_and_flush(comm_t *ctx)
+{
+    /* usleep source code */
+    struct timespec request, remaining;
+    request.tv_sec = ctx->response_timeout.tv_sec;
+    request.tv_nsec = ((long int)ctx->response_timeout.tv_usec % 1000000)
+        * 1000;
+    while (nanosleep(&request, &remaining) == -1 && errno == EINTR)
+        request = remaining;
+    return mb_flush(ctx);
+}
+int mb_flush(comm_t *ctx)
+{
+    int rc = tcflush(ctx->s, TCIOFLUSH);
+    if (rc != -1 && ctx->debug) {
+        printf("%d bytes flushed\n", rc);
+    }
+    return rc;
+}
+static ssize_t mb_recv(comm_t *ctx, uint8_t *rsp, int rsp_length)
+{
+    return read(ctx->s, rsp, rsp_length);
+}
+static uint8_t compute_meta_length_after_function(int function, int msg_type)
+{
+    int length;
+
+    if (msg_type == 0) {							//指示模式为本机作为从机接收主机发来的指令
+        if ((function <= 0x06) ||
+        			(function == 0x08)){							//wsf20150113
+            length = 4;
+        } else if (function == 0x0F ||
+                   function == 0x10) {		//0x10写多个寄存器,起始地址高低+寄存器数量高低+字节数 = 5
+            length = 5;
+        } else if (function == 0x17) {
+            length = 9;
+        } else {
+            /* _FC_READ_EXCEPTION_STATUS, _FC_REPORT_SLAVE_ID */
+            length = 0;
+        }
+    } else {
+        /* MSG_CONFIRMATION */										//确认模式为本机作为主机接收到从机发来的确认指令
+        switch (function) {
+        case 0x05:								//0x05写单个线圈起始地址高低+输出数量高低共4个字节
+        case 0x06:						//0x06写单个寄存器,起始地址高低+寄存器数量高低共4个字节
+        case 0x0f:						//0x0F写多个线圈,起始地址高低+输出值高低共4个字节
+        case 0x10:				//0x10写多个寄存器,起始地址高低+寄存器数量高低共4个字节
+        case 0x08:											//0x08诊断命令 wsf20150114
+            length = 4;
+            break;
+        default:
+            length = 1;
+        }
+    }
+
+    return length;
+}
+static int compute_data_length_after_meta(comm_t *ctx, uint8_t *msg, int msg_type)
+{
+    int function = msg[1];					// 从接收数组msg中提取function功能码
+    int length;
+    /*
+     * 此处针对写多字节命令,根据之a元数据分析后面还有多少各字节为要从串口读出的
+     * 其他未在case中显示的命令返回length值为0
+     */
+    if (msg_type == 0) {
+        switch (function) {
+        case 0x0F:
+        case 0x10:
+            length = msg[1 + 5];
+            break;
+        case 0x17:
+            length = msg[1 + 9];
+            break;
+        default:
+            length = 0;
+        }
+    } else {
+        /* MSG_CONFIRMATION */
+        if (function <= 0x04 ||
+            function == 0x11 ||
+            function == 0x17) {
+            length = msg[1 + 1];
+        } else {
+            length = 0;
+        }
+    }
+    /*
+     * 程序最后将上面得到的长度再加上默认的CRC校验长度(2),最终得到全部还要读出数据的中长度
+     */
+    length += 2;
+
+    return length;
+}

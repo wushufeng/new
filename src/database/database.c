@@ -24,8 +24,8 @@
 #include "../log/rtulog.h"
 #define ALLWELL	17
 exchangebuffer *pexbuffer[ALLWELL];											// 存放功图电参的临时buffer
-extern oil_well *poilwell[17];
-
+extern oil_well *poilwell[ALLWELL];
+instrument_timeout instimeout[63];
 
 const uint16_t UT_BITS_ADDRESS = 0x13;
 const uint16_t UT_BITS_NB = 0x25;
@@ -38,7 +38,7 @@ const uint8_t UT_INPUT_BITS_TAB[] = { 0xAC, 0xDB, 0x35 };
 const uint16_t UT_REGISTERS_ADDRESS = 0x00;
 /* Raise a manual exception when this adress is used for the first byte */
 const uint16_t UT_REGISTERS_ADDRESS_SPECIAL = 0x6C;
-const uint16_t UT_REGISTERS_NB = 20000;
+const uint16_t UT_REGISTERS_NB = 10000;
 const uint16_t UT_REGISTERS_TAB[] = { 0x022B, 0x0001, 0x0064 };
 /* If the following value is used, a bad response is sent.
    It's better to test with a lower value than
@@ -63,6 +63,7 @@ extern E1_sys_attribute *psysattr;
 static int databaseThreadFunc(void *arg);
 static int syncElecData(int group);
 static int syncDgData(int group);
+static int kickInstrumentData();
 
 int databaseThreadCancel(void)
 {
@@ -117,7 +118,8 @@ static int databaseThreadFunc(void *arg)
 			zlog_error(c, "系统时间读取有误");
 			return -1;
 		}
-
+		// 维护仪表信息表
+		kickInstrumentData();
 		// TODO 判断是否有数据要更新MBbuffer
 		for(n = 0; n < ALLWELL; n ++)
 		{
@@ -261,215 +263,7 @@ int mbMappingNew(void)
  * wsf
  * 通过0x06功能码修改配置文件
  */
-int mbWriteSigleRegister(uint16_t address, int data)
-{
-	char str[32];
-//	static char data_flag_ip = 0;
-	switch(address)
-	{
-		case 0:		// 应用得井站类型
-			sprintf(str,"%03d",psysattr->baseinfo.well_station_type);
-			if (!write_profile_string("rtuBaseInfo","well_station_type",str,A11filename))
-				return -1;
-			break;
-		case 1:		// 设备厂家
-			sprintf(str,"%d",psysattr->baseinfo.dev_company);
-			if (!write_profile_string("rtuBaseInfo","dev_company",str,A11filename))
-				return -1;
-			break;
-		case 2:		// 型号版本
-			sprintf(str,"%d",psysattr->baseinfo.type_version);
-			if (!write_profile_string("rtuBaseInfo","type_version",str,A11filename))
-				return -1;
-			break;
-		case 3:		// 口令
-			sprintf(str,"%d",psysattr->baseinfo.password);
-			if (!write_profile_string("rtuBaseInfo","password",str,A11filename))
-				return -1;
-			break;
-		case 6:		// 系统时间
-		case 7:
-		case 8:
 
-			break;
-		case 9:		// 系统日期
-		case 10:
-		case 11:
-
-			break;
-		case 12:		// 日时间起点
-		case 13:
-		case 14:
-
-			break;
-		case 30:		// 通信方式
-		{
-			psysattr->commparam.communication_mode = data;
-			sprintf(str,"%d",psysattr->commparam.communication_mode);
-			if (!write_profile_string("commParam","communication_mode",str,A11filename))
-				return -1;
-			break;
-		}
-		case 31:		// 通讯协议
-			psysattr->commparam.communication_protocols = data;
-			sprintf(str,"%d",psysattr->commparam.communication_protocols);
-			if (!write_profile_string("commParam","communication_protocols",str,A11filename))
-				return -1;
-			break;
-		case 32:		// 终端通信地址
-			psysattr->commparam.terminal_comm_address = data;
-			sprintf(str,"%d",psysattr->commparam.terminal_comm_address);
-			if (!write_profile_string("commParam","terminal_comm_address",str,A11filename))
-				return -1;
-			break;
-		case 33:		// 波特率
-			psysattr->commparam.comm_baudrate = data;
-			sprintf(str,"%d",psysattr->commparam.comm_baudrate);
-			if (!write_profile_string("commParam","comm_baudrate",str,A11filename))
-				return -1;
-			break;
-		case 34:		// 数据位
-			psysattr->commparam.comm_databit = data;
-			sprintf(str,"%d",psysattr->commparam.comm_databit);
-			if (!write_profile_string("commParam","comm_databit",str,A11filename))
-				return -1;
-			break;
-		case 35:		// 停止位
-			psysattr->commparam.comm_stopbit = data;
-			sprintf(str,"%d",psysattr->commparam.comm_stopbit);
-			if (!write_profile_string("commParam","comm_stopbit",str,A11filename))
-				return -1;
-			break;
-		case 36:		//奇偶校验
-			psysattr->commparam.comm_paritybit = data;
-			sprintf(str,"%d",psysattr->commparam.comm_paritybit);
-			if (!write_profile_string("commParam","comm_paritybit",str,A11filename))
-				return -1;
-			break;
-		case 37:		// 半/全双工
-			psysattr->commparam.comm_duplex = data;
-			sprintf(str,"%d",psysattr->commparam.comm_duplex);
-			if (!write_profile_string("commParam","comm_duplex",str,A11filename))
-				return -1;
-			break;
-		case 38:		// 本地IP地址
-		case 39:
-		case 40:
-		case 41:
-//			psysattr->commparam.ip_address[0] = d?ata;
-//			data_flag_ip |= 0x01;
-//			if(data_flag_ip == 0x0F)
-//			{
-//				data_flag_ip = 0x00;
-			sprintf(str,"%d.%d.%d.%d",psysattr->commparam.ip_address[0],
-					psysattr->commparam.ip_address[1],
-					psysattr->commparam.ip_address[2],
-					psysattr->commparam.ip_address[3]);
-			if (!write_profile_string("commParam","ip_address",str,A11filename))
-				return -1;
-//			}
-			break;
-		case 42:		// 子网掩码
-		case 43:
-		case 44:
-		case 45:
-//			psysattr->commparam.subnet_mask[0] = data;
-			sprintf(str,"%d.%d.%d.%d",psysattr->commparam.subnet_mask[0],
-						psysattr->commparam.subnet_mask[1],
-						psysattr->commparam.subnet_mask[2],
-						psysattr->commparam.subnet_mask[3]);
-				if (!write_profile_string("commParam","subnet_mask",str,A11filename))
-					return -1;
-			break;
-		case 46:		// 网关
-		case 47:
-		case 48:
-		case 49:
-			sprintf(str,"%d.%d.%d.%d",psysattr->commparam.gateway[0],
-						psysattr->commparam.gateway[1],
-						psysattr->commparam.gateway[2],
-						psysattr->commparam.gateway[3]);
-				if (!write_profile_string("commParam","gateway",str,A11filename))
-					return -1;
-			break;
-		case 50:		// MAC地址
-		case 51:
-		case 52:
-		case 53:
-		case 54:
-		case 55:
-			sprintf(str,"%02X:%02X:%02X:%02X:%02X:%02X",psysattr->commparam.mac_address[0],
-					psysattr->commparam.mac_address[1],
-					psysattr->commparam.mac_address[2],
-					psysattr->commparam.mac_address[3],
-					psysattr->commparam.mac_address[4],
-					psysattr->commparam.mac_address[5]);
-			if (!write_profile_string("commParam","mac_address",str,A11filename))
-				return -1;
-			break;
-		case 56:		// TCP/UDP标识
-			sprintf(str,"%d",psysattr->commparam.tcp_udp_identity);
-			if (!write_profile_string("commParam","tcp_udp_identity",str,A11filename))
-				return -1;
-			break;
-		case 57:		// 本地UDP端口号
-			sprintf(str,"%d",psysattr->commparam.upd_port);
-			if (!write_profile_string("commParam","upd_port",str,A11filename))
-				return -1;
-			break;
-		case 58:		// 本地TCP端口号
-			sprintf(str,"%d",psysattr->commparam.tcp_port);
-			if (!write_profile_string("commParam","tcp_port",str,A11filename))
-				return -1;
-			break;
-		case 59:		// 主站IP地址
-		case 60:
-		case 61:
-		case 62:
-			sprintf(str,"%d.%d.%d.%d",psysattr->commparam.master_ip_address[0],
-						psysattr->commparam.master_ip_address[1],
-						psysattr->commparam.master_ip_address[2],
-						psysattr->commparam.master_ip_address[3]);
-			if (!write_profile_string("commParam","master_ip_address",str,A11filename))
-				return -1;
-			break;
-		case 63:		// 主站端口号
-			psysattr->commparam.master_port = data;
-			sprintf(str,"%d",psysattr->commparam.master_port);
-			if (!write_profile_string("commParam","master_port",str,A11filename))
-				return -1;
-			break;
-		case 64:		// 主站通讯方式
-			psysattr->commparam.master_comm_mode = data;
-			sprintf(str,"%d",psysattr->commparam.master_comm_mode);
-			if (!write_profile_string("commParam","master_comm_mode",str,A11filename))
-				return -1;
-			break;
-		case 65:		// 下行通信接口
-			psysattr->commparam.downlink_comm_interface = data;
-			sprintf(str,"%d",psysattr->commparam.downlink_comm_interface);
-			if (!write_profile_string("commParam","downlink_comm_interface",str,A11filename))
-				return -1;
-			break;
-		case 66:		// 下行通信接收超时时间
-			psysattr->commparam.downlink_recv_timeout = data;
-			sprintf(str,"%d",psysattr->commparam.downlink_recv_timeout);
-			if (!write_profile_string("commParam","downlink_recv_timeout",str,A11filename))
-				return -1;
-			break;
-		case 67:		// 下行通讯失败重发次数
-			psysattr->commparam.downlink_resend_num = data;
-			sprintf(str,"%d",psysattr->commparam.downlink_resend_num);
-			if (!write_profile_string("commParam","downlink_resend_num",str,A11filename))
-				return -1;
-			break;
-
-		default:
-			break;
-	}
-
-	return 0;
-}
 /*
  * 同步功图电参数据
  */
@@ -489,5 +283,27 @@ static int syncDgData(int group)
 	memcpy(&poilwell[group]->load_displacement.dynagraph.pumping_stroke, &pexbuffer[group]->loaddata.pumping_stroke, 4);
 	memcpy(&poilwell[group]->load_displacement.dynagraph.load, &pexbuffer[group]->loaddata.load, 250);
 	memcpy(&poilwell[group]->load_displacement.dynagraph.displacement, &pexbuffer[group]->loaddata.displacement, 250);
+	return 0;
+}
+/**
+ * @brief
+ * 维护大庆厂家定义的仪表信息
+ */
+static int kickInstrumentData()
+{
+	int n;
+	time_t now_time = time(NULL);
+	for(n = 0;n < 63;n ++)
+	{
+		if(instimeout[n].start_time != 0)
+		{
+			if((instimeout[n].start_time + instimeout[n].interval) < now_time)
+			{
+//				printf("kick info\n");
+				bzero(&poilwell[0]->fuction_param.custom.instrument[n], sizeof(instrument_parameter));
+				bzero(&instimeout[n].start_time, sizeof(instrument_timeout));
+			}
+		}
+	}
 	return 0;
 }

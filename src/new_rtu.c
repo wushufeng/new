@@ -11,6 +11,13 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <netdb.h>
+//#include <sys/socket.h>
+//#include <netinet/in.h>
+//#include <arpa/inet.h>
+//#include <mach/gpio.h>
+//#include <mach/at91_pio.h>
+//#include <assert.h>
 
 #include "./log/rtulog.h"
 #include "def.h"
@@ -19,11 +26,12 @@
 #include "./sever/serial232/Serial232.h"
 #include "./sever/net1000/Net1000.h"
 #include "./sever/serialzigbee/SerialZigbee.h"
+//#include "./sever/serialzigbee/zigbee.h"
 #include "./sever/serialGPRS/SerialGPRS.h"
 #include "./sever/AI8/a5d35ai.h"
 #include "common/common.h"
 #include "./managerDB/ManagerDB.h"
-
+#include "./sever/sysdatetime/getsysdatetime.h"
 
 #define MAXBUFSIZE 512
 char AppPathFileName[MAXBUFSIZE];
@@ -32,22 +40,17 @@ char AppFileName[32];
 char AppOptinFile[MAXBUFSIZE];//配置文件路径
 char SysIniFile[MAXBUFSIZE];//系统ini文件
 
-
-//extern exchangebuffer *pexbuffer[17];
 E1_sys_attribute *psysattr;
-//extern oil_well *poilwell[16];
-//pthread_mutex_t holdingReg_mutex;
-//char tt[1024];
-//void u2_printf(char *dest, char* fmt,...);
-//
-//void u2_printf(char *dest, char *fmt,...)
-//{
-//	va_list ap;
-//	va_start(ap,fmt);
-//	vsprintf((char*)dest,fmt,ap);
-//	va_end(ap);
-//}
 
+typedef struct
+{
+	int gprs_sta;
+	int net_sta;
+	int zigbee_sta;
+	int rs232_sta;
+	int rs485_sta;
+	int aidi_sta;
+}ser_sta_t;
 //void mb_mapping_free(mb_mapping_t *mb_mapping);
 
 int main(int argc, char *argv[])
@@ -57,25 +60,38 @@ int main(int argc, char *argv[])
 	char cCh;
 	char bDoExit ;
 	int n;
+	ser_sta_t ser_sta = {0, 0, 0, 0, 0, 0};
+	int zigbee_en = 1;
+	int gprs_en = 0;
+	int net_en = 1;
+	int s232_en = 0;
 
-	int zigbee_en = 0;
-	int gprs_en = 1;
+//    char hname[128];
+//    struct hostent *hent;
+//    int i;
+
 	// zlog
 	if((res = Zlog_init()) != 0)
 		return res;
 	if((res = Zlog_get_category()) != 0)
 		return res;
-//	res = zlog_init("rtulog.conf");
-//	if (res) {
-//		printf("RTU日志初始化失败\n");
-//		return -1;
-//	}
-//	c = zlog_get_category("my_cat");
-//	if (!c) {
-//		printf("获取RTU日志类型失败\n");
-//		zlog_fini();
-//		return -2;
-//	}
+
+//	unsigned short int ttt[] = {0x0019, 0x0059, 0x0009, 0x2005, 0x0008, 0x0015};
+//	res = setSystemTime(ttt);
+//	if(res == 0)
+//		printf("设置时间成功\n");
+//	else
+//		printf("设置时间失败\n");
+
+//	gethostname(hname, sizeof(hname));
+//    //hent = gethostent();
+//    hent = gethostbyname(hname);
+//
+//    printf("hostname: %s/naddress list: ", hent->h_name);
+//    for(i = 0; hent->h_addr_list[i]; i++) {
+//        printf("%s/t", inet_ntoa(*(struct in_addr*)(hent->h_addr_list[i])));
+//    }
+
 ////	 创建holdingreg全局锁
 //    res = pthread_mutex_init(&holdingReg_mutex,NULL);
 //    if(res != 0)
@@ -85,7 +101,9 @@ int main(int argc, char *argv[])
 //    }
 ////     开辟20000个空间,用于mb保持寄存器
 //	u2_printf(tt, "测试测试!!!!%s%s%s%d", "1", "2", "3",4);printf("%s\n", tt);
+	zlog_info(c, "******************************************");
 	zlog_info(c, "**************RTU程序启动*****************");
+	zlog_info(c, "******************************************");
 	zlog_info(c, "RTU日志模块初始化完毕");
 //	zlog_debug(c, "MBMapping数据空间错误!");
 //	zlog_warn(c, "A11配置文件不存在，创建新文件并写入默认配置");
@@ -107,6 +125,22 @@ int main(int argc, char *argv[])
 		zlog_error(c, "启动数据同步失败");
 		exit(EXIT_FAILURE);
 	}
+//	int sss = 0;
+//	while (1)
+//	{
+////		switch (sss) {
+////		case 0:
+////		case 1:
+////			sss  = 1;
+////			break;
+////		}
+////		sss = 5;
+//		if(sss == 0)
+//			sss = 1;
+//		else if(sss == 1)
+//			sss = 3;
+//	}
+//	sss = 9;
 //	printf("[提示]创建sqlite库!\n");
 //	testCreateTables();
 //	databaseInsert(pexbuffer[0]);
@@ -140,6 +174,7 @@ int main(int argc, char *argv[])
 		{
 			zlog_info(c, "GPRS初始化完成");
 			zlog_info(c, "启动GPRS线程");
+			ser_sta.gprs_sta = 1;
 			res = createGprsThread();
 		    if(res != 0)
 		    {
@@ -157,7 +192,7 @@ int main(int argc, char *argv[])
 	 */
 		//////////////////////////////////////////////////////////
 //    if(0)
-	if(psysattr->commparam.communication_protocols == CP_MB_TCPIP)
+	if((psysattr->commparam.communication_mode == CM_WIRELESS_BRIDGES) || (net_en))
 	{
 		zlog_info(c, "Net1000正在初始化...");
 		res = net1000Init((void *) psysattr);
@@ -165,6 +200,7 @@ int main(int argc, char *argv[])
 		{
 			zlog_info(c, "Net1000初始化完成");
 			zlog_info(c, "启动Net1000线程");
+			ser_sta.net_sta = 1;
 			res = createNet1000Thread();
 		    if(res != 0)
 		    {
@@ -179,7 +215,7 @@ int main(int argc, char *argv[])
 	 * Serial232
 	 */
 //	if(0)
-	if(psysattr->commparam.communication_protocols == CP_MB_RTU)
+	if((psysattr->commparam.communication_protocols == CP_MB_RTU) && (s232_en))
 	{
 		zlog_info(c, "Serial232正在初始化...");
 		res = serial232Init((void *)psysattr);
@@ -187,6 +223,7 @@ int main(int argc, char *argv[])
 		{
 			zlog_info(c, "Serial232初始化完成");
 			zlog_info(c, "启动Serial232线程!");
+			ser_sta.rs232_sta = 1;
 			res = createSerial232Thread();
 			if(res != 0)
 			{
@@ -203,12 +240,15 @@ int main(int argc, char *argv[])
 	if((psysattr->commparam.downlink_comm_interface == DCI_ZIGBEE) && (zigbee_en))
 	{
 		zlog_info(c, "ZigBee正在初始化...");
-		res = serialZigbeeInit((void *) psysattr);
+//		res = serialZigbeeInit((void *) psysattr);
+		res = zbInit((void *) psysattr);
 		if(res == 0)
 		{
 			zlog_info(c, "ZigBee初始化完成");
 			zlog_info(c, "启动ZigBee线程");
-			res = createZigbeeThread();
+			ser_sta.zigbee_sta = 1;
+//			res = createZigbeeThread();
+			res = createZbThread();
 		    if(res != 0)
 		    {
 		    	zlog_error(c, "ZigBee线程创建失败");
@@ -265,31 +305,44 @@ int main(int argc, char *argv[])
     while( !bDoExit );
 	// 取消并join数据库线程
 	databaseThreadCancel();
-	AIDIThreadCancel();
-	net1000ThreadCancel();
-	if(zigbee_en)
-		serialZigbeeCancel();
-//	serial232ThreadCancel();
-	if(gprs_en)
+	if(ser_sta.aidi_sta)
+		AIDIThreadCancel();
+	if(ser_sta.net_sta)
+		net1000ThreadCancel();
+	if(ser_sta.zigbee_sta)
+//		serialZigbeeCancel();
+		cancelZbThread();
+	if(ser_sta.rs232_sta)
+		serial232ThreadCancel();
+	if(ser_sta.gprs_sta)
 		serialGPRSThreadCancel();
 
 
-//	if(psysattr != NULL)
-//		free(psysattr);
+	zlog_info(c, "正在释放内存...");
 	for(n = 0; n < 16; n ++)
 	{
 		if(mb_mapping[n] !=NULL)
 			modbus_mapping_free(mb_mapping[n]); // modbus_mapping_t
+//		if(pexbuffer[n] != NULL)
+//		{
+//			free(pexbuffer[n]);
+//			pexbuffer[n] = NULL;
+//		}
 //			mb_mapping_free(mb_mapping[n]);
 	}
-	zlog_info(c, "正在释放内存...");
-	net1000Free();
-//	serial232Free();
-	if(zigbee_en)
-		serialZigbeeFree();
-//	if(gprs_en)
-//		serialGprsFree();
-	zlog_info(c, "**************RTU程序正常退出*****************");
+	if(ser_sta.net_sta)
+		net1000Free();
+	if(ser_sta.rs232_sta)
+		serial232Free();
+	if(ser_sta.zigbee_sta)
+//		serialZigbeeFree();
+		zbFree();
+//	zlog_info(c, "serialGprsFree();");
+	if(ser_sta.gprs_sta)
+		serialGprsFree();
+	zlog_info(c, "*********************************************");
+	zlog_info(c, "**************RTU程序正常退出****************");
+	zlog_info(c, "*********************************************");
 	zlog_fini();
 	exit(EXIT_SUCCESS);
 }

@@ -2046,7 +2046,9 @@ void modbus_free(modbus_t *ctx)
         return;
 
     free(ctx->backend_data);
+    ctx->backend_data = NULL;
     free(ctx);
+    ctx = NULL;
 }
 
 void modbus_set_debug(modbus_t *ctx, int boolean)
