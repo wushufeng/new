@@ -12,8 +12,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <string.h>
-#include <termios.h>
-#include <string.h>
+//#include <termios.h>
 //#include <typeinfo>
 #include <arpa/inet.h>
 #include <time.h>
@@ -522,10 +521,12 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 										|| (now_time > (last_time[instrument_group] + poilwell[instrument_group]->load_displacement.dynagraph.interval * 60))) \
 												&& (pexbuffer[instrument_group]->dg_online == 0x3C))
 								{
+//									pexbuffer[instrument_group]->dg_online = 0x3C;
 									// 取出测试间隔
 									pexbuffer[instrument_group]->loaddata.interval = poilwell[instrument_group]->load_displacement.dynagraph.interval;
 									// 取出预设得测试点数
 									pexbuffer[instrument_group]->loaddata.set_dot = poilwell[instrument_group]->load_displacement.dynagraph.set_dot;
+									data_ex[instrument_group].dot = poilwell[instrument_group]->load_displacement.dynagraph.set_dot;
 									// 清零手动采集标识
 									poilwell[instrument_group]->load_displacement.dynagraph.manul_collection_order = 0;
 									last_time[instrument_group] = now_time;
@@ -543,13 +544,17 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 											zlog_info(c, "提示]发送一体化功图采[组=%d]集命令失败!", instrument_group);
 											break;
 										}
+										usleep(500000); // 岔开功图和电参的采集命令间隔500ms
 										zlog_info(c, "发送电参[组=%d]采集命令", instrument_group);
 										rsp_length = collectElecRespone(&data_ex[instrument_group]);
 									}
 								}
 								else
 								{
+									// 接到常规数据包置位在线标识,同时清除数据包OK标识
 									pexbuffer[instrument_group]->dg_online = 0x3C;
+									pexbuffer[instrument_group]->dg_OK = 0;
+
 									zlog_info(c, "接收到一体化功图[组=%d]常规数据帧", instrument_group);
 									// 常规数据应答
 									rsp_length = conventionalDataRespone(0x003C);
@@ -567,14 +572,14 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 								if(dynagraph_data->data_serialnum[0] == 0)									// 说明该数据为第一组数据
 								{
 									dg_dot = htons(dynagraph_data->dot);
-									if(dg_dot <=  250)
+									if((dg_dot <=  250) && (dg_dot >= 200))
 									{
 										dg_group = (unsigned char)(dg_dot / 15);
 										dg_remainder = (unsigned char)(dg_dot %15);
 									}
 									else
 									{
-										zlog_warn(c, "一体化功图[组=%d]采集总点数[%d] > 250",  instrument_group, dg_dot);
+										zlog_warn(c, "一体化功图[组=%d]采集总点数[%d] 最大250, 最小200",  instrument_group, dg_dot);
 										dg_group = 0;
 										dg_remainder = 0;
 										break;
@@ -598,7 +603,7 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 									dynagraph_other = (A11_req_dynagraph_others *)req;
 									dg_num = dynagraph_other->data_serialnum;
 
-									if(dg_num <= dg_group)
+									if((dg_num <= dg_group) && dg_group)
 									{
 										for(n = 0; n < 15; n ++)
 										{
@@ -616,7 +621,11 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 										}
 										zlog_info(c, "接收到一体化功图[组=%d]数据第 [%d] 包", instrument_group, dynagraph_other->data_serialnum);
 										pexbuffer[instrument_group]->dg_time = time(NULL);
-										pexbuffer[instrument_group]->dg_OK = 0x3C;
+										pexbuffer[instrument_group]->dg_OK = 0x3C;				// 运行至此处说明功图数据全部读回
+										dg_remainder = 0;
+										dg_num = 0;
+										dg_dot = 0;
+										dg_group = 0;
 									}
 								}
 								rsp_length = dataGroupRespone(0x0201);			// 准备一体化功图数据包应答数据
@@ -629,9 +638,14 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 										zlog_warn(c, "一体化功图[组= %d]数据包有误", instrument_group);
 										break;
 									}
-
+									usleep(500000); // 岔开功图回应答和电参的读取命令间隔500ms
 									rsp_length = readElecRespone(&data_ex[instrument_group]);
 									zlog_info(c, "开始读取电流图[组=%d]数据包", instrument_group);
+//									printf("dg_online = %d; dg_OK = %d ; elec_Online = %d; elec_OK = %d \n",
+//											pexbuffer[instrument_group]->elec_online,
+//											pexbuffer[instrument_group]->dg_OK,
+//											pexbuffer[instrument_group]->elec_online,
+//											pexbuffer[instrument_group]->elec_OK);
 								}
 								break;
 							}
@@ -644,49 +658,69 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 					{
 						A11_revdata_press_tempreture * wireless_press;
 						wireless_press = (A11_revdata_press_tempreture *)req;
+						device_base_information *ptr;
 						/* 根据仪器组号和编号判断数据放到哪里
 						 *
 						 */
 						switch(htons(wireless_press->A11_framehead.data_type))
 						{
 							case 0x0000:																		//	上传的常规数据
+							{
+								switch(wireless_press->A11_framehead.instument_num)		//检测仪器编号(1:油压 2:套压 3:回压)
+								{
+									case 1:
+//										ptr = &poilwell[instrument_group]->fuction_param.device_infor.oil_pressure;
+										ptr = &pexbuffer[instrument_group]->device_infor.oil_pressure;
+										pexbuffer[instrument_group]->oil_pressure = 0x3C;					// 同步标识
+										zlog_info(c, "接收到无线压力油压[组=%d]常规数据帧", instrument_group);
+										break;
+									case 2:
+//										ptr = &poilwell[instrument_group]->fuction_param.device_infor.casing_pressure;
+										ptr = &pexbuffer[instrument_group]->device_infor.casing_pressure;
+										pexbuffer[instrument_group]->casing_pressure = 0x3C;					// 同步标识
+										zlog_info(c, "接收到无线压力套压[组=%d]常规数据帧", instrument_group);
+										break;
+									case 3:
+//										ptr = &poilwell[instrument_group]->fuction_param.device_infor.back_pressure;
+										ptr = &pexbuffer[instrument_group]->device_infor.back_pressure;
+										pexbuffer[instrument_group]->back_pressure = 0x3C;					// 同步标识
+										zlog_info(c, "接收到无线压力回压[组=%d]常规数据帧", instrument_group);
+										break;
+									default:
+//										ptr = &poilwell[instrument_group]->fuction_param.device_infor.other_device[0];
+										ptr = &pexbuffer[instrument_group]->device_infor.other_device[0];
+										zlog_info(c, "接收到无线压力其他[组=%d]常规数据帧", instrument_group);
+										break;
+								}
+								// 取出当前时间
+								pexbuffer[instrument_group]->device_time = time(NULL);
 								// 厂家代码
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.company_code
-								= htons(wireless_press->A11_framehead.company_code);
+								ptr->company_code = htons(wireless_press->A11_framehead.company_code);
 								// 仪表类型
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_type
-								= htons(wireless_press->A11_framehead.instrument_type);
+								ptr->device_type = htons(wireless_press->A11_framehead.instrument_type);
 								// 仪表组号
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_group
-								= (wireless_press->A11_framehead.instrument_group);
+								ptr->device_group = (wireless_press->A11_framehead.instrument_group);
 								// 仪表编号
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_no
-								= (wireless_press->A11_framehead.instument_num);
+								ptr->device_no = (wireless_press->A11_framehead.instument_num);
 								// 通信效率
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.comm_efficiency
-								= (uint16_t)(wireless_press->A11_frame_data.comm_efficiency);
+								ptr->comm_efficiency = (uint16_t)(wireless_press->A11_frame_data.comm_efficiency);
 								// 电池电压
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.bat_vol
-								= (uint16_t)(wireless_press->A11_frame_data.bat_vol);
+								ptr->bat_vol = (uint16_t)(wireless_press->A11_frame_data.bat_vol);
 								// 休眠时间
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.sleep_time
-								= htons(wireless_press->A11_frame_data.sleep_time);
+								ptr->sleep_time = htons(wireless_press->A11_frame_data.sleep_time);
 								// 仪表状态
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.device_sta
-								= htons(wireless_press->A11_frame_data.instument_sta);
+								ptr->device_sta = htons(wireless_press->A11_frame_data.instument_sta);
 								// 工作温度
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.work_temp[0]
-//								= htons(wireless_press->instument_temp[0]) ;
-//								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.work_temp[1]
-//								= htons(wireless_press->instument_temp[1]) ;
+								ptr->work_temp[0] = htons(wireless_press->instument_temp[0]) ;
+								ptr->work_temp[1] = htons(wireless_press->instument_temp[1]) ;
 								// 实时数据
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.realtime_data[0]
-								= htons(wireless_press->realtime_data[0]) ;
-								poilwell[instrument_group]->fuction_param.device_infor.oil_pressure.realtime_data[1]
-								= htons(wireless_press->realtime_data[1]) ;
-								zlog_info(c, "接收到无线压力[组=%d]常规数据帧", instrument_group);
+								ptr->realtime_data[0] = htons(wireless_press->realtime_data[0]) ;
+								ptr->realtime_data[1] = htons(wireless_press->realtime_data[1]) ;
+//								zlog_info(c, "接收到无线压力[组=%d]常规数据帧", instrument_group);
+
 								rsp_length = conventionalDataRespone(0x004C);
 								break;
+							}
 							case 0x0010:													// 上传的常规参数
 								break;
 							default:
@@ -698,43 +732,36 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 					{
 						A11_revdata_press_tempreture * wireless_tempreture;
 						wireless_tempreture = (A11_revdata_press_tempreture *)req;
+						device_base_information *ptr;
 						switch(htons(wireless_tempreture->A11_framehead.data_type))
 						{
 							case 0x0000:
+								// 取出当前时间
+								pexbuffer[instrument_group]->device_time = time(NULL);
+								ptr = &pexbuffer[instrument_group]->device_infor.wellhead_oil_temp;
+								pexbuffer[instrument_group]->wellhead_oil_temp = 0x3C;					// 同步标识
 								// 厂家代码
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.company_code
-								= htons(wireless_tempreture->A11_framehead.company_code);
+								ptr->company_code = htons(wireless_tempreture->A11_framehead.company_code);
 								// 仪表类型
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_type
-								= htons(wireless_tempreture->A11_framehead.instrument_type);
+								ptr->device_type = htons(wireless_tempreture->A11_framehead.instrument_type);
 								// 仪表组号
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_group
-								= (wireless_tempreture->A11_framehead.instrument_group);
+								ptr->device_group = (wireless_tempreture->A11_framehead.instrument_group);
 								// 仪表编号
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_no
-								= (wireless_tempreture->A11_framehead.instument_num);
+								ptr->device_no = (wireless_tempreture->A11_framehead.instument_num);
 								// 通信效率
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.comm_efficiency
-								= (uint16_t)(wireless_tempreture->A11_frame_data.comm_efficiency);
+								ptr->comm_efficiency = (uint16_t)(wireless_tempreture->A11_frame_data.comm_efficiency);
 								// 电池电压
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.bat_vol
-								= (uint16_t)(wireless_tempreture->A11_frame_data.bat_vol);
+								ptr->bat_vol = (uint16_t)(wireless_tempreture->A11_frame_data.bat_vol);
 								// 休眠时间
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.sleep_time
-								= htons(wireless_tempreture->A11_frame_data.sleep_time);
+								ptr->sleep_time = htons(wireless_tempreture->A11_frame_data.sleep_time);
 								// 仪表状态
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.device_sta
-								= htons(wireless_tempreture->A11_frame_data.instument_sta);
+								ptr->device_sta = htons(wireless_tempreture->A11_frame_data.instument_sta);
 								// 工作温度
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.work_temp[0]
-//								= htons(wireless_tempreture->instument_temp[0]) ;
-//								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.work_temp[1]
-//								= htons(wireless_tempreture->instument_temp[1]) ;
+								ptr->work_temp[0] = htons(wireless_tempreture->instument_temp[0]) ;
+								ptr->work_temp[1] = htons(wireless_tempreture->instument_temp[1]) ;
 								// 实时数据
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.realtime_data[0]
-								= htons(wireless_tempreture->realtime_data[0]) ;
-								poilwell[instrument_group]->fuction_param.device_infor.wellhead_oil_temp.realtime_data[1]
-								= htons(wireless_tempreture->realtime_data[1]) ;
+								ptr->realtime_data[0] = htons(wireless_tempreture->realtime_data[0]) ;
+								ptr->realtime_data[1] = htons(wireless_tempreture->realtime_data[1]) ;
 								zlog_info(c, "接收到无线温度[组=%d]常规数据帧", instrument_group);
 								rsp_length = conventionalDataRespone(0x004C);
 								break;
@@ -755,7 +782,9 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 						{
 							case 0x0000:				// 电参得常规应答
 								// 说明电参在线
+								// 接到常规数据包置位在线标识,同时清除数据包OK标识
 								pexbuffer[instrument_group]->elec_online = 0x3C;
+								pexbuffer[instrument_group]->elec_OK = 0;
 								memcpy(&data_ex[instrument_group].ZB91_framehead, &elec_param->ZB91_framehead, sizeof(ZB91_revdata_framehead));
 								memcpy(&data_ex[instrument_group].A11_framehead, &elec_param->A11_framehead, sizeof(A11_data_framehead));
 
@@ -820,7 +849,7 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 
 									elec_other = (A11_req_elec_others *)req;
 
-									if(elec_num <= elec_group)
+									if((elec_num <= elec_group) && elec_group)
 									{
 										for(n = 0; n < 15; n ++)
 										{
@@ -832,13 +861,17 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 									}
 									else
 									{
-										for(n = 0; n < dg_remainder; n ++)
+										for(n = 0; n < elec_remainder; n ++)
 										{
 											pexbuffer[instrument_group]->loaddata.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
 											pexbuffer[instrument_group]->loaddata.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
 										}
 										zlog_info(c, "接收到电流图[组=%d]数据第 [%d] 包", instrument_group, elec_num);
 										pexbuffer[instrument_group]->elec_OK = 0x3C;
+										elec_remainder = 0;
+										elec_num = 0;
+										elec_dot = 0;
+										elec_group = 0;
 									}
 
 								}
@@ -860,11 +893,134 @@ static int zbReply(comm_t *ctx,  uint8_t *req, int req_length, uint8_t *snd)
 						break;
 					case 0x0009:											// 无线一体化转速扭矩
 						break;
+					case 0x1000:											// 自定义无功图对应的独立电参设备
+					{
+						time_t now_time = time(NULL);							// 读出当前时间秒数
+						static time_t last_time[17] = {0};
+						unsigned short int interval = poilwell[0]->fuction_param.custom.dynagraph_patroltime;
+						unsigned short int dot = poilwell[0]->fuction_param.custom.dynagraph_dot;
+
+						A11_revdata_electrical_parameter *elec_param;
+						elec_param = (A11_revdata_electrical_parameter *)req;
+
+						switch(htons(elec_param->A11_framehead.data_type))
+						{
+							case 0x0000:				// 电参得常规应答
+								if(((last_time[instrument_group] == 0) || (now_time > (last_time[instrument_group] + interval))) \
+								&& (pexbuffer[instrument_group]->elec2_online == 0x3C))
+								{
+									last_time[instrument_group] = now_time;
+									data_ex[instrument_group].dot = dot;
+									zlog_info(c, "发送电参+[组=%d]采集命令", instrument_group);
+									rsp_length = collectElecRespone(&data_ex[instrument_group]);
+								}
+								else
+								{
+									// 说明电参在线
+									// 接到常规数据包置位在线标识,同时清除数据包OK标识
+									pexbuffer[instrument_group]->elec2_online = 0x3C;
+									pexbuffer[instrument_group]->elec2_OK = 0;
+									memcpy(&data_ex[instrument_group].ZB91_framehead, &elec_param->ZB91_framehead, sizeof(ZB91_revdata_framehead));
+									memcpy(&data_ex[instrument_group].A11_framehead, &elec_param->A11_framehead, sizeof(A11_data_framehead));
+
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_a[0] = htons(elec_param->current_phase_a[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_a[1] = htons(elec_param->current_phase_a[1]);
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_b[0] = htons(elec_param->current_phase_b[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_b[1] = htons(elec_param->current_phase_b[1]);
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_c[0] = htons(elec_param->current_phase_c[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.current_phase_c[1] = htons(elec_param->current_phase_c[1]);
+									// 电机工作电压
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_a[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_a[1]);
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_b[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_b[1]);
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[0] = htons(elec_param->voltage_phase_c[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.voltage_phase_a[1] = htons(elec_param->voltage_phase_c[1]);
+									// 功率因数
+									poilwell[instrument_group]->run_ctrl.elec_param.power_factor[0] = htons(elec_param->power_factor[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.power_factor[1] = htons(elec_param->power_factor[1]);
+									// 有功功率
+									poilwell[instrument_group]->run_ctrl.elec_param.moto_p[0] = htons(elec_param->moto_p[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.moto_p[1] = htons(elec_param->moto_p[1]);
+									// 无功功率
+									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[0] = htons(elec_param->moto_q[0]);
+									poilwell[instrument_group]->run_ctrl.elec_param.moto_q[1] = htons(elec_param->moto_q[1]);
+
+									zlog_info(c, "接收到无线电参+[组=%d]常规数据帧", instrument_group);
+
+									rsp_length = conventionalDataRespone(0x00B8);
+								}
+								break;
+							case 0x0010:
+								break;
+							case 0x0030:				// 上传的电参数据包
+							{
+								A11_req_elec_first *elec_data;
+								elec_data = (A11_req_elec_first *)req;
+								elec_num = elec_data->data_serialnum;
+								if(elec_num == 0)									// 说明该数据为第一组数据
+								{
+									elec_dot = htons(elec_data->dot);
+									if(elec_dot <=  250)
+									{
+										elec_group = (unsigned char)(elec_dot / 15);
+										elec_remainder = (unsigned char)(elec_dot %15);
+									}
+									else
+									{
+										zlog_warn(c, "电参+[组=%d]采集总点数[%d] > 250", instrument_group, elec_dot);
+										elec_group = 0;
+										elec_remainder = 0;
+										break;
+									}
+									zlog_info(c, "接收到电流图+[组=%d]数据第 [%d] 包", instrument_group,elec_num);
+								}
+								else
+								{
+									A11_req_elec_others *elec_other;
+
+									elec_other = (A11_req_elec_others *)req;
+
+									if((elec_num <= elec_group) && elec_group)
+									{
+										for(n = 0; n < 15; n ++)
+										{
+											pexbuffer[instrument_group]->loaddata.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
+											pexbuffer[instrument_group]->loaddata.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
+										}
+
+										zlog_info(c, "接收到电流图+[组=%d]数据第 [%d] 包", instrument_group, elec_num);
+									}
+									else
+									{
+										for(n = 0; n < elec_remainder; n ++)
+										{
+											pexbuffer[instrument_group]->loaddata.current[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[n]);
+											pexbuffer[instrument_group]->loaddata.power[(elec_num - 1) * 15 + n] = htons(elec_other->current_chart[(15 + n)]);
+										}
+										zlog_info(c, "接收到电流图+[组=%d]数据第 [%d] 包", instrument_group, elec_num);
+										pexbuffer[instrument_group]->elec2_OK = 0x3C;
+										elec_remainder = 0;
+										elec_num = 0;
+										elec_dot = 0;
+										elec_group = 0;
+									}
+
+								}
+								rsp_length = dataGroupResponeElec(0x0211);			// 电流图
+								break;
+							}
+							default:
+								break;
+						}
+						break;
+						break;
+					}
 					case 0x1F10:											// 控制器(RTU)设备
 						break;
 					case 0x1F11:											// 控制器(RTU)设备
 						break;
-					default:													// 手操器
+					default:												// 手操器
 						break;
 				}
 				break;

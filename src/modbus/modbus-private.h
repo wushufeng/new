@@ -104,14 +104,14 @@ typedef struct _modbus_backend {
 
 struct _modbus {
     /* Slave address */
-    int slave;																	// 从机地址
+    int slave;															// 从机地址
     /* Socket or file descriptor */
-    int s;																		// 文件描述符或者是套接字
-    int debug;																// 是否启用调试模式
+    int s;																// 文件描述符或者是套接字
+    int debug;															// 是否启用调试模式
     int error_recovery;													// 错误恢复
-    struct timeval response_timeout;						// 回应超时
-    struct timeval byte_timeout;								// 断包超时
-    const modbus_backend_t *backend;					// 后台结构体指针
+    struct timeval response_timeout;									// 回应超时
+    struct timeval byte_timeout;										// 断包超时
+    const modbus_backend_t *backend;									// 后台结构体指针
     void *backend_data;
 };
 

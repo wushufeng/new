@@ -302,3 +302,69 @@ int getDynagraphDateTime(void *obj, time_t syncTime)
 		free(pLocalTime);
 	return 0;
 }
+/**
+ * @brief
+ * 时间格式转换
+ * 将字符串时间"2015-10-04 23:48:30"转换为4个unsigned short int型BCD码
+ */
+int tmStringToFourUint16(const char *p_tm, unsigned short int *p_bcd)
+{
+	char *ptr = NULL;
+	char *ptr1 = NULL;
+	int year, month, day, hour, min, sec;
+	ptr = strstr(p_tm, "-");
+	if(ptr != NULL)
+	{
+		*ptr = 0;
+		year = atoi(p_tm);
+	}
+	else
+		return -1;
+
+	ptr1 = strstr((ptr + 1), "-");
+	if(ptr1 != NULL) {
+		*ptr1 = 0;
+		month = atoi(ptr + 1);
+	}
+	else
+		return -1;
+	ptr = strstr((ptr1 + 1), " ");
+	if(ptr != NULL)	{
+		*ptr = 0;
+		day = atoi(ptr1 + 1);
+	}
+	else
+		return -1;
+	ptr1 = strstr((ptr+1), ":");
+	if(ptr1 != NULL) {
+		*ptr1 = 0;
+		hour = atoi(ptr + 1);
+	}
+	else
+		return -1;
+	ptr = strstr((ptr1 + 1), ":");
+	if(ptr != NULL) {
+		*ptr = 0;
+		min = atoi(ptr1 + 1);
+	}
+	else
+		return -1;
+	sec = atoi(ptr + 1);
+//	printf("%04d-%02d-%02d %02d:%02d:%02d\n", year, month, day, hour, min, sec);
+	*p_bcd ++ = (DEC2BCD(year / 100) << 8) + DEC2BCD(year % 100);
+	*p_bcd ++ = (DEC2BCD(month) << 8) + DEC2BCD(day);
+	*p_bcd ++ = (DEC2BCD(0x20) << 8) + DEC2BCD(hour);
+	*p_bcd = (DEC2BCD(min) << 8) + DEC2BCD(sec);
+
+//	unsigned short int a[4];
+//	char *p = a;
+//	*p ++ = DEC2BCD(year % 100);
+//	*p ++ = DEC2BCD(year / 100);
+//	*p ++ = DEC2BCD(day);
+//	*p ++ = DEC2BCD(month);
+//	*p ++ = DEC2BCD(hour);
+//	*p ++ = DEC2BCD(0x20);
+//	*p ++ = DEC2BCD(sec);
+//	*p ++ = DEC2BCD(min);
+	return 0;
+}

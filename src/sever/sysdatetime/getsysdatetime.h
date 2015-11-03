@@ -54,4 +54,6 @@ int getDynagraphDateTime(void *obj, time_t syncTime);
 int setSystemTime(void *dt);
 unsigned char DEC2BCD(const unsigned char decDat);
 unsigned char BCD2DEC(unsigned char bcdDat);
+int tmStringToFourUint16(const char *p_tm, unsigned short int *p_bcd);
+
 #endif /* SRC_SYSDATETIME_GETSYSDATETIME_H_ */

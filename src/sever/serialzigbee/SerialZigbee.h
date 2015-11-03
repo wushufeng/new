@@ -94,12 +94,12 @@ typedef struct
  */
 typedef struct
 {
-	unsigned short int protocol_type;							// 协议类型
+	unsigned short int protocol_type;						// 协议类型
 	unsigned short int company_code;						// 厂商代码
 	unsigned short int instrument_type;						// 仪表类型
 	unsigned char instrument_group;							// 仪表组号
-	unsigned char instument_num;								// 仪表编号
-	unsigned short int data_type;									// 数据类型
+	unsigned char instument_num;							// 仪表编号
+	unsigned short int data_type;							// 数据类型
 //	unsigned char orther_data[0];
 } __attribute__((packed)) A11_data_framehead;
 

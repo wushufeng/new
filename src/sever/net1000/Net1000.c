@@ -11,7 +11,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <arpa/inet.h>
-#include<netdb.h>
+#include <netdb.h>
 
 //#include	<sys/socket.h>
 //#include	<sys/un.h>
@@ -74,6 +74,7 @@ static int net1000ThreadFunc(void *arg)
 			modbus_set_debug(ctx_net1000, TRUE);
 		}
 	}
+
 	if (use_backend_net1000 == TCP)
 	{
 		switch(comm_mode)					// 主站通信方式

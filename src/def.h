@@ -19,7 +19,7 @@
 #define HAVE_INTTYPES_H 1
 #define HAVE_STDINT_H 1
 
-//#define ARM_32				1
+#define ARM_32				1
 
 //#ifdef HAVE_INTTYPES_H
 //#include <inttypes.h>

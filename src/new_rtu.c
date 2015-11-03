@@ -4,14 +4,16 @@
  *  Created on: 2015年3月20日
  *      Author: wsf
  */
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <netdb.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 //#include <sys/socket.h>
 //#include <netinet/in.h>
 //#include <arpa/inet.h>
@@ -51,6 +53,7 @@ typedef struct
 	int aidi_sta;
 }ser_sta_t;
 //void mb_mapping_free(mb_mapping_t *mb_mapping);
+//int testCopy(char * file);
 
 int main(int argc, char *argv[])
 {
@@ -60,8 +63,8 @@ int main(int argc, char *argv[])
 	char bDoExit ;
 	int n;
 	ser_sta_t ser_sta = {0, 0, 0, 0, 0, 0};
-	int zigbee_en = 0;
-	int gprs_en = 1;
+	int zigbee_en = 1;
+	int gprs_en = 0;
 	int net_en = 1;
 	int s232_en = 0;
 
@@ -69,11 +72,21 @@ int main(int argc, char *argv[])
 //    struct hostent *hent;
 //    int i;
 
+//	testCopy(NULL);
+
 	// zlog
 	if((res = Zlog_init()) != 0)
 		return res;
 	if((res = Zlog_get_category()) != 0)
 		return res;
+
+
+//	printf("[提示]创建sqlite库!\n");
+////	testCreateTables();
+////	databaseInsert(pexbuffer[0]);
+//
+//	searchOldestData();
+//	printf("[提示] 数据库调试完成!\n");
 
 //	unsigned short int ttt[] = {0x0019, 0x0059, 0x0009, 0x2005, 0x0008, 0x0015};
 //	res = setSystemTime(ttt);
@@ -117,7 +130,7 @@ int main(int argc, char *argv[])
 
 	// 加载A11数据,该指针指向mb保持寄存器
 	psysattr = LoadConfigA11();
-	zlog_info(c, "启动数据同步线程!");
+	zlog_info(c, "启动数据同步线程");
 	res = createDatabaseThread();
 	if(res != 0)
 	{
@@ -140,11 +153,7 @@ int main(int argc, char *argv[])
 //			sss = 3;
 //	}
 //	sss = 9;
-//	printf("[提示]创建sqlite库!\n");
-//	testCreateTables();
-//	databaseInsert(pexbuffer[0]);
-//	showRecordsByTime(0);
-//	printf("[提示] 数据库调试完成!\n");
+
 	/* @brief
 	 * wsf
 	 * 创建aidi线程
@@ -316,7 +325,7 @@ int main(int argc, char *argv[])
 
 
 	zlog_info(c, "正在释放内存...");
-	for(n = 0; n < 16; n ++)
+	for(n = 0; n < 17; n ++)
 	{
 		if(mb_mapping[n] !=NULL)
 			modbus_mapping_free(mb_mapping[n]); // modbus_mapping_t
@@ -341,15 +350,29 @@ int main(int argc, char *argv[])
 	zlog_fini();
 	exit(EXIT_SUCCESS);
 }
-//void mb_mapping_free(mb_mapping_t *mb_mapping)
+
+//int testCopy(char * file)
 //{
-//    if (mb_mapping == NULL) {
-//        return;
-//    }
-//
-//    free(mb_mapping->tab_input_registers);
-//    free(mb_mapping->tab_registers);
-//    free(mb_mapping->tab_input_bits);
-//    free(mb_mapping->tab_bits);
-//    free(mb_mapping);
+//	char block[1024];
+//	int in ,out;
+//	int nread, uu;
+//	uu = 0;
+//	in = open("newRTU_Bottle_x86", O_RDONLY);
+//	out = open("newRTU_Bottle_x86_bak", O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IXOTH);
+//	while((nread = read(in, block, 1024)) > 0)
+//	{
+////		printf("0x%02X ", c);
+//		if(uu == 0)
+//		{
+//			int n = 0;
+////			block[n] = 0x01;
+//			for(n = 0; n < nread; n ++)
+//				printf("0x%02X ", block[n]);
+//			printf("\n");
+//			uu = 1;
+//		}
+//		write(out, block, nread);
+//	}
+//	printf("\n");
+//	return 1;
 //}

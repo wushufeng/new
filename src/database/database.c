@@ -64,12 +64,21 @@ static int databaseThreadFunc(void *arg);
 static int syncElecData(int group);
 static int syncDgData(int group);
 static int kickInstrumentData();
+static int syncDeviceInfo(int group);
 
 int databaseThreadCancel(void)
 {
 	int res;
 	void * thread_result;
+	int n;
 
+	// free动态得数据交换寄存器内存
+	for(n = 0; n < ALLWELL; n ++)
+	{
+		if (pexbuffer[n] != NULL) {
+			free(pexbuffer[n]);
+		}
+	}
 	int kill_rc = pthread_kill(database_hread,0);		// 使用pthread_kill函数发送信号0判断线程是否还在
 	zlog_info(c, "正在取消数据同步线程...");
 	if(kill_rc == ESRCH)					// 线程不存在：ESRCH
@@ -120,19 +129,26 @@ static int databaseThreadFunc(void *arg)
 		}
 		// 维护仪表信息表
 		kickInstrumentData();
-		// TODO 判断是否有数据要更新MBbuffer
+		// 删除数据库中的过期数据
+		delOvertimeData();
+		// 查找最老一条数据并更新A11中的时间
+		searchOldestData();
+		// TODO 判断是否有数据要更新MBbuffer  并将要保存得数据存入数据库
 		for(n = 0; n < ALLWELL; n ++)
 		{
+			if(n == 3)
+			{
+				printf("dg_online = %d; dg_OK = %d; elec_Online = %d; elec_OK = %d \n",
+						pexbuffer[n]->dg_online,
+						pexbuffer[n]->dg_OK,
+						pexbuffer[n]->elec_online,
+						pexbuffer[n]->elec_OK);
+			}
 			if((pexbuffer[n]->elec_online == 0x3C) && (pexbuffer[n]->dg_online == 0x3C))
 			{
 				// 功图和电参都在线
 				if((pexbuffer[n]->dg_OK == 0x3C) && (pexbuffer[n]->elec_OK == 0x3C))
 				{
-					// 功图和电参都测试完毕
-//					pexbuffer[n]->dg_OK = 0x00;
-//					pexbuffer[n]->dg_online = 0x00;
-//					pexbuffer[n]->elec_OK = 0x00;
-//					pexbuffer[n]->elec_online = 0x00;
 					// 更新功图
 					syncDgData(n);
 					// 更新电参
@@ -144,40 +160,125 @@ static int databaseThreadFunc(void *arg)
 					databaseInsert(&pexbuffer[n]->loaddata, n, pexbuffer[n]->dg_time, 1 , 1);
 					zlog_info(c, "功图和电参数据存入数据库");
 					// 清零数据交换区
-					bzero(pexbuffer[n], sizeof(exchangebuffer));
+					pexbuffer[n]->dg_OK = 0x00;
+					pexbuffer[n]->dg_online = 0x00;
+					pexbuffer[n]->elec_OK = 0x00;
+					pexbuffer[n]->elec_online = 0x00;
+					pexbuffer[n]->dg_time = 0x00;
+					bzero(&pexbuffer[n]->loaddata, sizeof(load_displacement));
 				}
 			}
 			else if((pexbuffer[n]->dg_online == 0x3C) && (pexbuffer[n]->dg_OK == 0x3C))
 			{
-				// 只有功图在线 并获得完整功图数据
-//				pexbuffer[n]->dg_OK = 0x00;
-//				pexbuffer[n]->dg_online = 0x00;
-//				pexbuffer[n]->elec_OK = 0x00;
-//				pexbuffer[n]->elec_online = 0x00;
 				syncDgData(n);
 				zlog_info(c, "功图数据完成同步");
 				databaseInsert(&pexbuffer[n]->loaddata, n, pexbuffer[n]->dg_time, 1,  0);
 				zlog_info(c, "功图数据存入数据库");
 				// 清零数据交换区
-				bzero(pexbuffer[n], sizeof(exchangebuffer));
+				pexbuffer[n]->dg_OK = 0x00;
+				pexbuffer[n]->dg_online = 0x00;
+				pexbuffer[n]->elec_OK = 0x00;
+				pexbuffer[n]->elec_online = 0x00;
+				pexbuffer[n]->dg_time = 0x00;
+				bzero(&pexbuffer[n]->loaddata, sizeof(load_displacement));
 			}
 			else if((pexbuffer[n]->elec_online == 0x3C) && (pexbuffer[n]->elec_OK == 0x3C))
 			{
 				// 只有电参在线 并获得完整电参数据
-//				pexbuffer[n]->dg_OK = 0x00;
-//				pexbuffer[n]->dg_online = 0x00;
-//				pexbuffer[n]->elec_OK = 0x00;
-//				pexbuffer[n]->elec_online = 0x00;
 				syncElecData(n);
 				zlog_info(c, "电参数据完成同步");
 				databaseInsert(&pexbuffer[n]->loaddata, n, pexbuffer[n]->dg_time, 0, 1);
 				zlog_info(c, "电参数据存入数据库");
 				// 清零数据交换区
-				bzero(pexbuffer[n], sizeof(exchangebuffer));
+				pexbuffer[n]->dg_OK = 0x00;
+				pexbuffer[n]->dg_online = 0x00;
+				pexbuffer[n]->elec_OK = 0x00;
+				pexbuffer[n]->elec_online = 0x00;
+				pexbuffer[n]->dg_time = 0x00;
+				bzero(&pexbuffer[n]->loaddata, sizeof(load_displacement));
 			}
 			else
 			{
 
+			}
+			if(pexbuffer[n]->elec2_OK == 0x3C)
+			{
+				// 只有电参在线 并获得完整电参数据
+				syncElecData(n);
+				zlog_info(c, "电参+数据完成同步");
+				databaseInsert(&pexbuffer[n]->loaddata, n, 0, 0, 1);
+				zlog_info(c, "电参+数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->elec2_OK = 0x00;
+				pexbuffer[n]->elec2_online = 0x00;
+				bzero(&pexbuffer[n]->loaddata.current, 500);
+				bzero(&pexbuffer[n]->loaddata.power, 500);
+			}
+			if(pexbuffer[n]->oil_pressure == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "油压数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.oil_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "油压数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->oil_pressure = 0x00;
+				bzero(&pexbuffer[n]->device_infor.oil_pressure, sizeof(device_base_information));
+			}
+			if(pexbuffer[n]->casing_pressure == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "套压数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.oil_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "套压数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->casing_pressure = 0x00;
+				bzero(&pexbuffer[n]->device_infor.casing_pressure, sizeof(device_base_information));
+			}
+			if(pexbuffer[n]->back_pressure == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "回压数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.back_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "回压数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->back_pressure = 0x00;
+				bzero(&pexbuffer[n]->device_infor.back_pressure, sizeof(device_base_information));
+			}
+			if(pexbuffer[n]->wellhead_oil_temp == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "井口油温数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.oil_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "井口油温数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->wellhead_oil_temp = 0x00;
+				bzero(&pexbuffer[n]->device_infor.wellhead_oil_temp, sizeof(device_base_information));
+			}
+			if(pexbuffer[n]->load == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "载荷数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.oil_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "载荷数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->load = 0x00;
+				bzero(&pexbuffer[n]->device_infor.load, sizeof(device_base_information));
+			}
+			if(pexbuffer[n]->displacement == 0x3C)
+			{
+				syncDeviceInfo(n);
+				zlog_info(c, "位移数据完成同步");
+				deviceInfoInsert(&pexbuffer[n]->device_infor.oil_pressure, n, pexbuffer[n]->device_time);
+				zlog_info(c, "位移数据存入数据库");
+				// 清零数据交换区
+				pexbuffer[n]->device_time = 0;
+				pexbuffer[n]->displacement = 0x00;
+				bzero(&pexbuffer[n]->device_infor.displacement, sizeof(device_base_information));
 			}
 		}
 
@@ -305,5 +406,42 @@ static int kickInstrumentData()
 			}
 		}
 	}
+	return 0;
+}
+/**
+ * @brief
+ * 同步仪器信息
+ */
+static int syncDeviceInfo(int group)
+{
+	device_base_information *ptr;
+	device_base_information *ptr1;
+	ptr = &poilwell[group]->fuction_param.device_infor.oil_pressure;
+	ptr1 = &pexbuffer[group]->device_infor.oil_pressure;
+
+	memcpy(ptr, ptr1, sizeof(device_base_information));
+//	// 厂家代码
+//	ptr->company_code = ptr1->company_code;
+//	// 仪表类型
+//	ptr->device_type = ptr1->device_type;
+//	// 仪表组号
+//	ptr->device_group = ptr1->device_group;
+//	// 仪表编号
+//	ptr->device_no = ptr1->device_no;
+//	// 通信效率
+//	ptr->comm_efficiency = ptr1->comm_efficiency;
+//	// 电池电压
+//	ptr->bat_vol = ptr1->bat_vol;
+//	// 休眠时间
+//	ptr->sleep_time = ptr1->sleep_time;
+//	// 仪表状态
+//	ptr->device_sta = ptr1->device_sta;
+//	// 工作温度
+//	ptr->work_temp[0] = ptr1->work_temp[0];
+//	ptr->work_temp[1] = ptr1->work_temp[1];
+//	// 实时数据
+//	ptr->realtime_data[0] = ptr1->realtime_data[0] ;
+//	ptr->realtime_data[1] = ptr1->realtime_data[1] ;
+//	zlog_info(c, "油压数据完成同步");
 	return 0;
 }

@@ -203,9 +203,7 @@ int mbReply(comm_t *ctx, const  unsigned char *rev, unsigned char *snd, int req_
 	    		if(ctx->debug){
 	    			zlog_debug(c, "非法的子功能码%0X", address);
 	    		}
-	    		 rsp_length = response_exception(
-	    		                ctx, &sft,
-	    		                0x02, snd);
+	    		 rsp_length = response_exception(ctx, &sft, 0x02, snd);
 	        } else
 	        {
 	        	memcpy(snd, rev, req_length);

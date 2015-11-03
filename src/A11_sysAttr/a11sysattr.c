@@ -145,8 +145,10 @@ int getA11Configure(E1_sys_attribute *psysattr)
 	if(psysattr->commparam.master_port == -1)
 			return -1;
 
-	read_profile_string("commParam","master_ip_address",str,str_size,"",A11filename);
-	myIPtoa(".",str,psysattr->commparam.master_ip_address);
+	if(!read_profile_string("commParam","master_ip_address",str,str_size,"",A11filename))
+		return -1;
+	else
+		myIPtoa(".",str,psysattr->commparam.master_ip_address);
 
 	psysattr->commparam.tcp_port =read_profile_int("commParam","tcp_port",-1,A11filename);
 	if(psysattr->commparam.tcp_port == -1)

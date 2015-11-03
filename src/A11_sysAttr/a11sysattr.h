@@ -462,41 +462,41 @@ typedef struct
  */
 typedef struct
 {
-	unsigned short int st_reserved[4400];						// 标准预留地址4400个地址
+//	unsigned short int st_reserved[4400];						// 标准预留地址4400个地址
 	// 大庆A11扩展了此表从4700地址开始
 	// 表9-5 油井 RTU 补传历史数据存储地址表
-//	unsigned short int st_reserved[2400];
-//	unsigned short int history_start_time[5];					// 写要读取历史数据的起始时间
-//	unsigned short int history_index;							// 历史数据条目索引号
-	// 预留
-	// RTU记录中，最早一条历史数据得时间
-	// 预留
-	// 历史数据条目查询成功后，此条历史数据记录得创建时间
+	unsigned short int st_reserved[2400];
+	unsigned short int history_start_time[5];					// 写要读取历史数据的起始时间
+	unsigned short int history_index;							// 历史数据条目索引号
+	unsigned short int reserved1;								// 预留
+	unsigned short int oldest_data_time[5];						// RTU记录中，最早一条历史数据得时间
+	unsigned short int reserved2[3];							// 预留
+	unsigned short int data_create_time[5];						// 历史数据条目查询成功后，此条历史数据记录得创建时间
 	// 历史数据区
-	// 油压值
-	// 套压值
-	// 回压值
-	// 温度值
-	// 油压上传的时间
-	// 套压上传的时间
-	// 回压上传的时间
-	// 温度上传的时间
-	// 电参的周期采集时间
-	// 油套回温度的连接报警状态
-	// 油套回温度上下限报警状态
-	// 功图自动测量间隔
-	// 手工采集功图指令
-	// 功图采集设置点数
-	// 功图实际点数
-	// 功图采集时间
-	// 冲次
-	// 冲程
-	// 预留地址
-	// 250点位移量
-	// 250点载荷量
-	// 250点电流值
-	// 250点功率值
-	// 预留地址 920
+	unsigned short int oil_pressure[2];							// 油压
+	unsigned short int casing_pessure[2];						// 套压
+	unsigned short int back_pressure[2];						// 回压
+	unsigned short int temperature[2];							// 温度
+	unsigned short int oil_press_updatetime[6];					// 油压上传的时间
+	unsigned short int caseing_press_updatetime[6];				// 套压上传的时间
+	unsigned short int back_press_updatetime[6];				// 回压上传的时间
+	unsigned short int temperature_updatetime[6];				// 温度上传的时间
+	unsigned short int ele_cycle_clc_time[6];					// 电参的周期采集时间
+	unsigned short int ocb_connect_alarm_sta;					// 油套回温度的连接报警状态
+	unsigned short int ocb_updown_alarm_sta;					// 油套回温度上下限报警状态
+	unsigned short int interval;								// 功图自动测量间隔
+	unsigned short int manul_collection_order;					// 手工采集功图指令
+	unsigned short int set_dot;									// 功图采集设置点数
+	unsigned short int actual_dot;								// 功图实际点数
+	unsigned short int collection_datetime[6];					// 功图采集时间
+	unsigned short int pumping_speed[2];						// 冲次
+	unsigned short int pumping_stroke[2];						// 冲程
+	unsigned short int reserved3[6];							// 预留地址
+	unsigned short int displacement[250];						// 当前示功图数据-位移值250点
+	unsigned short int load[250];								// 位移点对应载荷值 250 点
+	unsigned short int current[250];							// 位移点对应电流值 250 点
+	unsigned short int power[250];								// 位移点对应有功功率值 250点
+	unsigned short int reserved4[920];							// 预留地址 920
 }__attribute__((packed)) standard_resvered;
 
 typedef enum {
